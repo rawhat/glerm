@@ -26,7 +26,7 @@ pub fn main() {
 
   let test_layout =
     horizontal_box(
-      [],
+      [Border(Rounded("blue"))],
       [
         text(
           [Border(Rounded("white")), Padding(5)],
