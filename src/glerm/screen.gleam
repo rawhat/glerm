@@ -14,10 +14,12 @@ pub fn get_dimensions() -> Position {
   assert Ok(width) = get_width()
   assert Ok(height) = get_height()
 
-  Position(height, width)
+  Position(height - 1, width - 1)
 }
 
-// TODO:  should this be more complex than `String`?  Maybe a custom `Cell`
-// component if we have to use that for colors
+pub type Cell {
+  Cell(value: String, color: String)
+}
+
 pub type Canvas =
-  Map(Position, String)
+  Map(Position, Cell)

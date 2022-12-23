@@ -1,11 +1,12 @@
+import gleam/erlang/atom.{Atom}
 import gleam/erlang/charlist.{Charlist}
 import gleam/erlang/process.{Subject}
 import gleam/int
 import gleam/list
 import gleam/otp/actor
-import gleam/map.{Map}
+import gleam/map
 import glerm/layout.{Element}
-import glerm/screen.{Canvas, Position}
+import glerm/screen.{Canvas, Cell, Position}
 
 pub type RendererState {
   RendererState(cursor: Position, canvas: Canvas)
@@ -44,7 +45,7 @@ pub fn create() -> Subject(Action) {
           RenderText(position, text) ->
             RendererState(
               ..state,
-              canvas: map.insert(state.canvas, position, text),
+              canvas: map.insert(state.canvas, position, Cell(text, "white")),
             )
           WriteCharacter(char) -> {
             let new_cursor = move_cursor(state.cursor, Forward)
@@ -52,7 +53,7 @@ pub fn create() -> Subject(Action) {
               canvas: map.insert(
                 state.canvas,
                 state.cursor,
-                char_code_to_string(char),
+                Cell(char_code_to_string(char), "white"),
               ),
               cursor: new_cursor,
             )
@@ -60,7 +61,7 @@ pub fn create() -> Subject(Action) {
           WriteString(str) -> {
             let new_cursor = move_cursor(state.cursor, Forward)
             RendererState(
-              canvas: map.insert(state.canvas, state.cursor, str),
+              canvas: map.insert(state.canvas, state.cursor, Cell(str, "white")),
               cursor: new_cursor,
             )
           }
@@ -95,8 +96,14 @@ fn render(canvas: Canvas, cursor: Position) -> Nil {
   canvas
   |> map.to_list
   |> list.each(fn(pair) {
-    assert #(position, value) = pair
-    write_charlist(position.x, position.y, charlist.from_string(value))
+    assert #(position, cell) = pair
+    let color = atom.create_from_string(cell.color)
+    write_charlist(
+      position.x,
+      position.y,
+      charlist.from_string(cell.value),
+      color,
+    )
   })
 
   draw_cursor(cursor)
@@ -135,12 +142,22 @@ external fn char_code_to_string(code: Int) -> String =
 external fn clear() -> Nil =
   "Elixir.ExTermbox.Bindings" "clear"
 
-external fn write_charlist(row: Int, col: Int, charlist: Charlist) -> Nil =
+external fn write_charlist(
+  row: Int,
+  col: Int,
+  charlist: Charlist,
+  color: Atom,
+) -> Nil =
   "Elixir.Glerm.Helpers" "write_charlist"
 
 external fn present() -> Nil =
   "Elixir.ExTermbox.Bindings" "present"
 
 fn draw_cursor(position: Position) -> Nil {
-  write_charlist(position.x, position.y, charlist.from_string("█"))
+  write_charlist(
+    position.x,
+    position.y,
+    charlist.from_string("█"),
+    atom.create_from_string("white"),
+  )
 }

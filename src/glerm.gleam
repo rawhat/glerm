@@ -2,7 +2,7 @@ import gleam/erlang/process
 import gleam/function
 import glerm/event_manager
 import glerm/layout.{
-  Border, Center, Square, White, horizontal_box, text, vertical_box,
+  Border, Padding, Rounded, horizontal_box, text, vertical_box,
 }
 import glerm/renderer.{Render}
 
@@ -26,11 +26,20 @@ pub fn main() {
 
   let test_layout =
     horizontal_box(
-      [Border(Square(White))],
+      [],
       [
-        text("hello"),
-        text("world"),
-        vertical_box([Center], [text("what"), text("up")]),
+        text(
+          [Border(Rounded("white")), Padding(5)],
+          "this is a long string that should wrap in the box, but we'll see if that actually works",
+        ),
+        text([Border(Rounded("red"))], "world"),
+        vertical_box(
+          [],
+          [
+            text([Border(Rounded("green"))], "what"),
+            text([Border(Rounded("yellow"))], "up"),
+          ],
+        ),
       ],
     )
 
