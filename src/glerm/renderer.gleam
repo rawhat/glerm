@@ -36,7 +36,7 @@ pub fn create() -> Subject(Action) {
         let selector = process.new_selector()
         let initial_state =
           RendererState(cursor: Position(0, 0), canvas: map.new())
-        render(initial_state.canvas, initial_state.cursor)
+        render(initial_state.canvas)
         actor.Ready(initial_state, selector)
       },
       init_timeout: 50,
@@ -74,7 +74,7 @@ pub fn create() -> Subject(Action) {
           }
           Return -> {
             let Position(x, ..) = screen.get_dimensions()
-            let new_cursor = Position(int.min(x, state.cursor.x + 1), 0)
+            let new_cursor = Position(int.min(x, state.cursor.column + 1), 0)
             RendererState(..state, cursor: new_cursor)
           }
           MoveCursor(direction) -> {
@@ -83,14 +83,14 @@ pub fn create() -> Subject(Action) {
           }
           Render(tree) -> RendererState(..state, canvas: layout.build(tree))
         }
-        render(updated_state.canvas, updated_state.cursor)
+        render(updated_state.canvas)
         actor.Continue(updated_state)
       },
     ))
   renderer
 }
 
-fn render(canvas: Canvas, cursor: Position) -> Nil {
+fn render(canvas: Canvas) -> Nil {
   clear()
 
   canvas
@@ -99,44 +99,42 @@ fn render(canvas: Canvas, cursor: Position) -> Nil {
     assert #(position, cell) = pair
     let color = atom.create_from_string(cell.color)
     write_charlist(
-      position.x,
-      position.y,
+      position.column,
+      position.row,
       charlist.from_string(cell.value),
       color,
     )
   })
-
-  draw_cursor(cursor)
   present()
 }
 
 fn move_cursor(existing: Position, direction: Direction) -> Position {
-  let Position(rows, columns) = screen.get_dimensions()
+  let Position(columns, rows) = screen.get_dimensions()
   case direction {
     Forward -> {
-      let at_column_end = existing.y + 1 >= columns
-      let at_row_end = existing.x + 1 >= rows
+      let at_column_end = existing.column + 1 > columns
+      let at_row_end = existing.row + 1 > rows
       case at_column_end, at_row_end {
-        False, _ -> Position(..existing, y: existing.y + 1)
-        True, False -> Position(x: existing.x + 1, y: 0)
+        False, _ -> Position(..existing, column: existing.column + 1)
+        True, False -> Position(column: 0, row: existing.row + 1)
         True, True -> existing
       }
     }
     Backward -> {
-      let at_column_beginning = existing.y - 1 < 0
-      let at_row_beginning = existing.x - 1 < 0
+      let at_column_beginning = existing.column - 1 < 0
+      let at_row_beginning = existing.row - 1 < 0
       case at_column_beginning, at_row_beginning {
-        True, False -> Position(x: existing.x - 1, y: columns - 1)
+        True, False -> Position(column: columns, row: existing.row - 1)
         True, True -> existing
-        False, _ -> Position(..existing, y: existing.y - 1)
+        False, _ -> Position(..existing, column: existing.column - 1)
       }
     }
-    Up -> Position(..existing, x: int.max(0, existing.x - 1))
-    Down -> Position(..existing, x: int.min(rows - 1, existing.x + 1))
+    Up -> Position(..existing, row: int.max(0, existing.row - 1))
+    Down -> Position(..existing, row: int.min(rows - 1, existing.row + 1))
   }
 }
 
-external fn char_code_to_string(code: Int) -> String =
+pub external fn char_code_to_string(code: Int) -> String =
   "Elixir.Glerm.Helpers" "char_code_to_string"
 
 external fn clear() -> Nil =
@@ -155,8 +153,8 @@ external fn present() -> Nil =
 
 fn draw_cursor(position: Position) -> Nil {
   write_charlist(
-    position.x,
-    position.y,
+    position.column,
+    position.row,
     charlist.from_string("█"),
     atom.create_from_string("white"),
   )

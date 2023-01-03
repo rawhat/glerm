@@ -9,18 +9,18 @@ defmodule Glerm.Helpers do
     %Cell{position: %Position{x: x, y: y}, ch: ch, fg: Constants.color(color)}
   end
 
-  def write_charlist(row, col, charlist, color) do
+  def write_charlist(col, row, charlist, color) do
     for {ch, x} <- Enum.with_index(charlist) do
       Termbox.put_cell(get_cell(col + x, row, ch, color))
     end
   end
 
-  def write_character(row, col, char, color) do
+  def write_character(col, row, char, color) do
     Termbox.put_cell(get_cell(col, row, char, color))
   end
 
   def convert_event({:event, %Event{ch: ch, key: key}}) do
-    {:event, ch, key}
+    {:raw_event, ch, key}
   end
 
   def char_code_to_string(code) do

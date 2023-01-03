@@ -7,14 +7,14 @@ external fn get_height() -> Result(Int, Nil) =
   "Elixir.ExTermbox.Bindings" "height"
 
 pub type Position {
-  Position(x: Int, y: Int)
+  Position(column: Int, row: Int)
 }
 
 pub fn get_dimensions() -> Position {
   assert Ok(width) = get_width()
   assert Ok(height) = get_height()
 
-  Position(height - 1, width - 1)
+  Position(width - 1, height - 1)
 }
 
 pub type Cell {
