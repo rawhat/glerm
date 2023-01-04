@@ -2,6 +2,7 @@ import gleam/erlang/process.{Pid, Subject}
 import gleam/otp/actor
 import glerm/event.{Event, Key}
 import glerm/runtime.{External, Message}
+import gleam/io
 
 external fn start_event_manager() -> Result(Pid, Nil) =
   "Elixir.ExTermbox.EventManager" "start_link"

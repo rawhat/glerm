@@ -45,7 +45,11 @@ pub fn create() -> Subject(Action) {
           RenderText(position, text) ->
             RendererState(
               ..state,
-              canvas: map.insert(state.canvas, position, Cell(text, "white")),
+              canvas: map.insert(
+                state.canvas,
+                position,
+                Cell(text, "white", "default"),
+              ),
             )
           WriteCharacter(char) -> {
             let new_cursor = move_cursor(state.cursor, Forward)
@@ -53,7 +57,7 @@ pub fn create() -> Subject(Action) {
               canvas: map.insert(
                 state.canvas,
                 state.cursor,
-                Cell(char_code_to_string(char), "white"),
+                Cell(char_code_to_string(char), "white", "default"),
               ),
               cursor: new_cursor,
             )
@@ -61,7 +65,11 @@ pub fn create() -> Subject(Action) {
           WriteString(str) -> {
             let new_cursor = move_cursor(state.cursor, Forward)
             RendererState(
-              canvas: map.insert(state.canvas, state.cursor, Cell(str, "white")),
+              canvas: map.insert(
+                state.canvas,
+                state.cursor,
+                Cell(str, "white", "default"),
+              ),
               cursor: new_cursor,
             )
           }
@@ -97,12 +105,13 @@ fn render(canvas: Canvas) -> Nil {
   |> map.to_list
   |> list.each(fn(pair) {
     assert #(position, cell) = pair
-    let color = atom.create_from_string(cell.color)
+    let color = atom.create_from_string(cell.foreground)
     write_charlist(
       position.column,
       position.row,
       charlist.from_string(cell.value),
-      color,
+      atom.create_from_string(cell.foreground),
+      atom.create_from_string(cell.background),
     )
   })
   present()
@@ -144,7 +153,8 @@ external fn write_charlist(
   row: Int,
   col: Int,
   charlist: Charlist,
-  color: Atom,
+  foreground: Atom,
+  background: Atom,
 ) -> Nil =
   "Elixir.Glerm.Helpers" "write_charlist"
 
@@ -157,5 +167,6 @@ fn draw_cursor(position: Position) -> Nil {
     position.row,
     charlist.from_string("█"),
     atom.create_from_string("white"),
+    atom.create_from_string("default"),
   )
 }

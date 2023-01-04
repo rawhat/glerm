@@ -38,6 +38,7 @@ pub type LineBreak {
 
 pub type Style {
   Style(
+    background: Option(String),
     border: Option(Border),
     padding: Option(Int),
     width: Option(Dimension),
@@ -49,6 +50,7 @@ pub type Style {
 
 pub fn style() -> Style {
   Style(
+    background: None,
     border: None,
     padding: None,
     width: None,
@@ -80,6 +82,10 @@ pub fn overflow(style: Style, overflow: Overflow) -> Style {
 
 pub fn line_break(style: Style, line_break: LineBreak) -> Style {
   Style(..style, line_break: Some(line_break))
+}
+
+pub fn background(style: Style, color: String) -> Style {
+  Style(..style, background: Some(color))
 }
 
 // Center
@@ -347,7 +353,7 @@ pub fn do_build(
                     bounding_box.top_left.column + col,
                     bounding_box.top_left.row + row,
                   ),
-                  Cell(char, "white"),
+                Cell(char, "white", option.unwrap(style.background, "default")),
                 )
               },
             )
@@ -382,7 +388,7 @@ pub fn do_build(
                   bounding_box.top_left.column + col,
                   bounding_box.top_left.row + row,
                 ),
-                Cell(char, "white"),
+                Cell(char, "white", option.unwrap(style.background, "default")),
               )
             })
           })
@@ -407,7 +413,7 @@ pub fn do_build(
               bounding_box.top_left.column + col,
               bounding_box.top_left.row,
             ),
-            Cell(char, "white"),
+            Cell(char, "white", option.unwrap(style.background, "default")),
           )
         },
       )
@@ -454,13 +460,19 @@ fn add_border(
   let top_border =
     iterator.range(top_left.column, top_right.column)
     |> iterator.map(fn(column) {
-      #(Position(column, top_left.row), Cell(horizontal_border, color_string))
+      #(
+        Position(column, top_left.row),
+        Cell(horizontal_border, color_string, "default"),
+      )
     })
 
   let right_border =
     iterator.range(top_right.row, bottom_right.row)
     |> iterator.map(fn(row) {
-      #(Position(top_right.column, row), Cell(vertical_border, color_string))
+      #(
+        Position(top_right.column, row),
+        Cell(vertical_border, color_string, "default"),
+      )
     })
 
   let bottom_border =
@@ -468,28 +480,31 @@ fn add_border(
     |> iterator.map(fn(column) {
       #(
         Position(column, bottom_left.row),
-        Cell(horizontal_border, color_string),
+        Cell(horizontal_border, color_string, "default"),
       )
     })
 
   let left_border =
     iterator.range(top_left.row, bottom_left.row)
     |> iterator.map(fn(row) {
-      #(Position(top_left.column, row), Cell(vertical_border, color_string))
+      #(
+        Position(top_left.column, row),
+        Cell(vertical_border, color_string, "default"),
+      )
     })
 
   let corners = case border {
     Square(_color) -> [
-      #(top_left, Cell(square_top_left, color_string)),
-      #(top_right, Cell(square_top_right, color_string)),
-      #(bottom_right, Cell(square_bottom_right, color_string)),
-      #(bottom_left, Cell(square_bottom_left, color_string)),
+      #(top_left, Cell(square_top_left, color_string, "default")),
+      #(top_right, Cell(square_top_right, color_string, "default")),
+      #(bottom_right, Cell(square_bottom_right, color_string, "default")),
+      #(bottom_left, Cell(square_bottom_left, color_string, "default")),
     ]
     Rounded(_color) -> [
-      #(top_left, Cell(rounded_top_left, color_string)),
-      #(top_right, Cell(rounded_top_right, color_string)),
-      #(bottom_right, Cell(rounded_bottom_right, color_string)),
-      #(bottom_left, Cell(rounded_bottom_left, color_string)),
+      #(top_left, Cell(rounded_top_left, color_string, "default")),
+      #(top_right, Cell(rounded_top_right, color_string, "default")),
+      #(bottom_right, Cell(rounded_bottom_right, color_string, "default")),
+      #(bottom_left, Cell(rounded_bottom_left, color_string, "default")),
     ]
   }
 

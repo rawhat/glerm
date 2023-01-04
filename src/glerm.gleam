@@ -3,8 +3,8 @@ import gleam/erlang/process
 import gleam/function
 import glerm/event_manager
 import glerm/layout.{
-  LineBreak, Percent, Pixels, Rounded, Word, border, height, horizontal_box,
-  line_break, padding, row, style, text, vertical_box, width,
+  LineBreak, Percent, Pixels, Rounded, Word, background, border, height,
+  horizontal_box, line_break, padding, row, style, text, vertical_box, width,
 }
 import glerm/renderer
 import glerm/event.{Backspace, Key}
@@ -12,8 +12,10 @@ import glerm/runtime.{
   Application, Command, Dispatch, External, None, application,
 }
 import gleam/string
+import gleam/int
 import gleam/io
 import gleam/list
+import gleam/option.{Option}
 
 external fn termbox_init() -> Nil =
   "Elixir.ExTermbox.Bindings" "init"
@@ -32,7 +34,7 @@ pub fn initialize(application: Application(state, action)) -> Nil {
 }
 
 pub type State {
-  State(input: String, results: List(String))
+  State(input: String, results: List(String), selected: Option(Int))
 }
 
 external fn os_cmd(cmd: charlist.Charlist) -> String =
@@ -47,6 +49,7 @@ fn grep(str: String) -> List(String) {
 
 pub type Action {
   SetResults(results: List(String))
+  UpdateSelected(index: Int)
 }
 
 pub fn main() {
@@ -57,20 +60,60 @@ pub fn main() {
   // process.monitor_process(process.subject_owner(event_manager))
   let app =
     application(
-      State("", []),
+      State("", [], option.None),
       fn(state, action) {
         case action {
-          Dispatch(SetResults(results)) -> #(
-            State(..state, results: results),
+          Dispatch(SetResults(results)) -> {
+            let selected = case results {
+              [] -> option.None
+              [_, ..] -> option.Some(0)
+            }
+            #(State(..state, results: results, selected: selected), None)
+          }
+          Dispatch(UpdateSelected(index)) -> #(
+            State(..state, selected: option.Some(index)),
             None,
           )
+          External(Key("p", control: True, ..)) ->
+            case state.results, state.selected {
+              [], _ -> #(state, None)
+              [_, ..], option.Some(n) if n == 0 -> #(state, None)
+              [_, ..], option.Some(n) -> #(
+                state,
+                Command(fn() {
+                  state.selected
+                  |> option.map(fn(selected) { selected - 1 })
+                  |> option.unwrap(0)
+                  |> UpdateSelected
+                  |> Dispatch
+                }),
+              )
+            }
+          External(Key("n", control: True, ..)) ->
+            case list.length(state.results), state.selected {
+              0, _ -> #(state, None)
+              length, option.Some(n) ->
+                case n == length - 1 {
+                  True -> #(state, None)
+                  _ -> #(
+                    state,
+                    Command(fn() {
+                      state.selected
+                      |> option.map(fn(selected) { selected + 1 })
+                      |> option.unwrap(0)
+                      |> UpdateSelected
+                      |> Dispatch
+                    }),
+                  )
+                }
+            }
           External(Key(key, ..)) -> {
-            let new_state = State(input: state.input <> key, results: [])
+            let new_state =
+              State(..state, input: state.input <> key, results: [])
             let cmd = case string.length(new_state.input) >= 3 {
               True ->
                 Command(fn() {
                   let results = grep(new_state.input)
-                  // io.debug(#("results", results))
                   Dispatch(SetResults(results))
                 })
               False -> None
@@ -80,10 +123,11 @@ pub fn main() {
           External(Backspace) -> {
             let new_state =
               State(
+                ..state,
                 input: string.slice(
                   state.input,
                   0,
-                  string.length(state.input) - 1,
+                  int.max(string.length(state.input) - 1, 0),
                 ),
                 results: [],
               )
@@ -107,7 +151,24 @@ pub fn main() {
             vertical_box(
               style()
               |> border(Rounded("white")),
-              list.map(state.results, fn(result) { row(style(), result) }),
+              list.index_map(
+                state.results,
+                fn(index, result) {
+                  row(
+                    option.map(
+                      state.selected,
+                      fn(selected) {
+                        case selected == index {
+                          True -> background(style(), "cyan")
+                          False -> style()
+                        }
+                      },
+                    )
+                    |> option.unwrap(style()),
+                    result,
+                  )
+                },
+              ),
             ),
             text(
               style()

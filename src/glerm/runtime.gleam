@@ -2,7 +2,7 @@ import gleam/erlang/process.{Subject}
 import gleam/otp/actor
 import glerm/layout.{Element}
 import glerm/renderer.{Action, Render}
-import glerm/event.{Event}
+import glerm/event.{Event, WindowResize}
 import gleam/function
 import gleam/io
 
@@ -62,13 +62,12 @@ pub fn create(
       init_timeout: 500,
       loop: fn(msg, state) {
         let #(new_state, command) = application.update(state.state, msg)
-        // io.debug(#("after update, we got", new_state, command))
-        case new_state == state.state {
-          True -> {
+        case new_state == state.state, msg == External(WindowResize) {
+          True, False -> {
             run_command(state.subject, command)
             actor.Continue(state)
           }
-          False -> {
+          _, _ -> {
             let new_view = application.view(new_state, application.update)
             process.send(renderer, Render(new_view))
             run_command(state.subject, command)
@@ -87,10 +86,9 @@ fn run_command(subject: Subject(Message(action)), action: Command(action)) {
       process.start(
         fn() {
           let msg = command()
-          // io.debug(#("ran command and got", msg))
           process.send(subject, msg)
         },
-        False,
+        True,
       )
       Nil
     }

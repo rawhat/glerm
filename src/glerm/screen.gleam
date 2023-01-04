@@ -18,7 +18,7 @@ pub fn get_dimensions() -> Position {
 }
 
 pub type Cell {
-  Cell(value: String, color: String)
+  Cell(value: String, foreground: String, background: String)
 }
 
 pub type Canvas =
