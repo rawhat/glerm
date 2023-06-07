@@ -10,6 +10,6 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-crossterm = { version = "0.26.1", features = ["event-stream"] }
+crossterm = { version = "0.26.1" }
 rustler = "0.28.0"
 serde = "1.0.163"

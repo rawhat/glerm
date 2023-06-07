@@ -1,7 +1,7 @@
 -module(glerm_ffi).
 
 -export([listen/1, print/1, size/0, clear/0, move_to/2, draw/1, enable_raw_mode/0,
-         disable_raw_mode/0]).
+         disable_raw_mode/0, enter_alternate_screen/0, leave_alternate_screen/0, enable_mouse_capture/0, disable_mouse_capture/0]).
 
 -nifs([{listen, 1},
        {print, 1},
@@ -10,7 +10,11 @@
        {move_to, 2},
        {draw, 1},
        {enable_raw_mode, 0},
-       {disable_raw_mode, 0}]).
+       {disable_raw_mode, 0},
+       {enter_alternate_screen, 0},
+       {leave_alternate_screen, 0},
+       {enable_mouse_capture, 0},
+       {disable_mouse_capture, 0}]).
 
 -on_load init/0.
 
@@ -51,4 +55,13 @@ enable_raw_mode() ->
   exit(nif_library_not_loaded).
 
 disable_raw_mode() ->
+  exit(nif_library_not_loaded).
+
+enter_alternate_screen() ->
+  exit(nif_library_not_loaded).
+leave_alternate_screen() ->
+  exit(nif_library_not_loaded).
+enable_mouse_capture() ->
+  exit(nif_library_not_loaded).
+disable_mouse_capture() ->
   exit(nif_library_not_loaded).

@@ -227,6 +227,18 @@ pub external fn enable_raw_mode() -> Result(Nil, Nil) =
 pub external fn disable_raw_mode() -> Result(Nil, Nil) =
   "glerm_ffi" "disable_raw_mode"
 
+pub external fn enter_alternate_screen() -> Result(Nil, Nil) =
+  "glerm_ffi" "enter_alternate_screen"
+
+pub external fn leave_alternate_screen() -> Result(Nil, Nil) =
+  "glerm_ffi" "leave_alternate_screen"
+
+pub external fn enable_mouse_capture() -> Result(Nil, Nil) =
+  "glerm_ffi" "enable_mouse_capture"
+
+pub external fn disable_mouse_capture() -> Result(Nil, Nil) =
+  "glerm_ffi" "disable_mouse_capture"
+
 pub type ListenerMessage(user_message) {
   Term(Event)
   User(user_message)
@@ -252,7 +264,6 @@ pub fn start_listener_spec(
     init: fn() {
       let pid = process.self()
       let assert #(state, user_selector) = spec.init()
-
       let term_selector =
         selector()
         |> process.map_selector(Term)
@@ -264,9 +275,7 @@ pub fn start_listener_spec(
           |> process.merge_selector(term_selector, _)
         })
         |> option.unwrap(term_selector)
-
       process.start(fn() { listen(pid) }, True)
-
       actor.Ready(state, selector)
     },
     init_timeout: 500,

@@ -11,7 +11,9 @@ pub fn main() {
   let selector =
     process.new_selector()
     |> process.selecting(subject, function.identity)
+  let assert Ok(_) = glerm.enter_alternate_screen()
   let assert Ok(_) = glerm.enable_raw_mode()
+  let assert Ok(_) = glerm.enable_mouse_capture()
   glerm.clear()
   glerm.move_to(0, 0)
   let assert Ok(_subj) =
@@ -21,6 +23,7 @@ pub fn main() {
         case msg {
           Key(Character("c"), Some(Control)) -> {
             let assert Ok(_) = glerm.disable_raw_mode()
+            let assert Ok(_) = glerm.disable_mouse_capture()
             process.send(subject, Nil)
             actor.Stop(process.Normal)
           }
@@ -34,4 +37,5 @@ pub fn main() {
       },
     )
   process.select_forever(selector)
+  glerm.leave_alternate_screen()
 }

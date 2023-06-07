@@ -2,10 +2,13 @@ use std::io::{stdout, Write};
 use std::sync::mpsc::channel;
 
 use crossterm::cursor::MoveTo;
-use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
+use crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers, MouseButton,
+    MouseEventKind,
+};
 use crossterm::event::{KeyEvent, MouseEvent};
 use crossterm::style::Print;
-use crossterm::terminal::{Clear, ClearType};
+use crossterm::terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{execute, queue, terminal};
 use rustler::types::tuple::{self, make_tuple};
 use rustler::{thread, Binary, Encoder, Env, LocalPid, Term};
@@ -273,7 +276,9 @@ fn listen(env: Env, pid: LocalPid) {
 
 #[rustler::nif]
 fn enable_raw_mode() -> Result<(), ()> {
-    terminal::enable_raw_mode().map_err(|_| ())
+    let res = terminal::enable_raw_mode();
+
+    res.map_err(|_| ())
 }
 
 #[rustler::nif]
@@ -283,9 +288,7 @@ fn disable_raw_mode() -> Result<(), ()> {
 
 #[rustler::nif]
 fn print(data: Binary) -> Result<(), ()> {
-    let _ = execute!(stdout(), Print(String::from_utf8_lossy(data.as_slice())));
-
-    Ok(())
+    execute!(stdout(), Print(String::from_utf8_lossy(data.as_slice()))).map_err(|_| ())
 }
 
 #[rustler::nif]
@@ -294,13 +297,13 @@ fn size() -> Result<(u16, u16), ()> {
 }
 
 #[rustler::nif]
-fn clear() {
-    let _ = execute!(stdout(), Clear(ClearType::All));
+fn clear() -> Result<(), ()> {
+    execute!(stdout(), Clear(ClearType::All)).map_err(|_| ())
 }
 
 #[rustler::nif]
-fn move_to(column: u16, row: u16) {
-    let _ = execute!(stdout(), MoveTo(column, row));
+fn move_to(column: u16, row: u16) -> Result<(), ()> {
+    execute!(stdout(), MoveTo(column, row)).map_err(|_| ())
 }
 
 #[rustler::nif]
@@ -310,6 +313,26 @@ fn draw(commands: Vec<(u16, u16, String)>) -> Result<(), ()> {
         queue!(stdout, MoveTo(*column, *row), Print(data)).map_err(|_| ())?;
     }
     stdout.flush().map_err(|_| ())
+}
+
+#[rustler::nif]
+fn enter_alternate_screen() -> Result<(), ()> {
+    execute!(stdout(), EnterAlternateScreen).map_err(|_| ())
+}
+
+#[rustler::nif]
+fn leave_alternate_screen() -> Result<(), ()> {
+    execute!(stdout(), LeaveAlternateScreen).map_err(|_| ())
+}
+
+#[rustler::nif]
+fn enable_mouse_capture() -> Result<(), ()> {
+    execute!(stdout(), EnableMouseCapture).map_err(|_| ())
+}
+
+#[rustler::nif]
+fn disable_mouse_capture() -> Result<(), ()> {
+    execute!(stdout(), DisableMouseCapture).map_err(|_| ())
 }
 
 rustler::init!(
@@ -322,6 +345,10 @@ rustler::init!(
         size,
         move_to,
         enable_raw_mode,
-        disable_raw_mode
+        disable_raw_mode,
+        enter_alternate_screen,
+        leave_alternate_screen,
+        enable_mouse_capture,
+        disable_mouse_capture,
     ]
 );
