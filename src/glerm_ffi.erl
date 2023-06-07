@@ -15,8 +15,18 @@
 -on_load init/0.
 
 init() ->
+  Arch = erlang:system_info(system_architecture),
   Priv = code:priv_dir(glerm),
-  Path = filename:join(Priv, libglerm),
+  ArchPath =
+    case Arch of
+      "x86_64-pc-linux" ++ _ ->
+        filename:join(Priv, "linux");
+      "win32" ->
+        filename:join(Priv, "windows");
+      "x86_64-apple-drawin" ++ _ ->
+        filename:join(Priv, "macos")
+    end,
+  Path = filename:join(ArchPath, libglerm),
   erlang:load_nif(Path, 0).
 
 listen(_Pid) ->
