@@ -13,9 +13,10 @@ pub fn main() {
     |> process.selecting(subject, function.identity)
   let assert Ok(_) = glerm.enable_raw_mode()
   glerm.clear()
+  glerm.move_to(0, 0)
   let assert Ok(_subj) =
     glerm.start_listener(
-      Nil,
+      0,
       fn(msg, state) {
         case msg {
           Key(Character("c"), Some(Control)) -> {
@@ -24,11 +25,10 @@ pub fn main() {
             actor.Stop(process.Normal)
           }
           _ -> {
-            glerm.clear()
-            glerm.move_to(0, 0)
+            glerm.move_to(0, state)
             let assert Ok(_) =
               glerm.print(bit_string.from_string(string.inspect(msg)))
-            actor.Continue(state)
+            actor.Continue(state + 1)
           }
         }
       },

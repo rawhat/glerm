@@ -1,12 +1,10 @@
-import gleam/bit_string
 import gleam/dynamic.{DecodeError, Decoder, Dynamic}
 import gleam/function
-import gleam/option.{Option, Some}
+import gleam/option.{None, Option, Some}
 import gleam/result
+import gleam/erlang/atom
 import gleam/erlang/process.{Pid, Selector, Subject}
 import gleam/otp/actor
-import gleam/string
-import gleam/io
 
 pub type Modifier {
   Shift
@@ -23,10 +21,6 @@ pub type KeyCode {
   Down
   Up
   Unsupported
-}
-
-pub type Resize {
-  Resize(Int, Int)
 }
 
 pub type MouseButton {
@@ -53,105 +47,160 @@ pub type Event {
   Focus(event: FocusEvent)
   Key(key: KeyCode, modifier: Option(Modifier))
   Mouse(event: MouseEvent)
-  Unknown(message: Dynamic)
+  Resize(Int, Int)
+  Unknown(tag: String, message: Dynamic)
 }
 
-external fn do_decode_atom(src: a, val: b) -> Result(b, List(DecodeError)) =
-  "glerm_ffi" "decode_atom"
-
-fn decode_atom(val: b) -> Decoder(b) {
-  fn(message: Dynamic) {
-    do_decode_atom(message, val)
+fn decode_atom(val: String, actual: a) -> Decoder(a) {
+  let real_atom = atom.create_from_string(val)
+  let decode =
+    function.compose(
+      atom.from_dynamic,
+      fn(maybe_atom) {
+        maybe_atom
+        |> result.then(fn(decoded) {
+          case decoded == real_atom {
+            True -> Ok(real_atom)
+            False -> Error([DecodeError(val, atom.to_string(decoded), [])])
+          }
+        })
+      },
+    )
+  fn(msg) {
+    decode(msg)
+    |> result.replace(actual)
   }
 }
 
 fn modifier_decoder() -> Decoder(Option(Modifier)) {
-  dynamic.optional(dynamic.any([
-    decode_atom(Shift),
-    decode_atom(Alt),
-    decode_atom(Control),
-  ]))
-}
-
-fn focus_decoder() -> Decoder(Event) {
-  dynamic.decode1(
-    Focus,
-    dynamic.element(1, dynamic.any([decode_atom(Gained), decode_atom(Lost)])),
-  )
+  let decode_some = decode_atom("some", Some)
+  dynamic.any([
+    decode_atom("none", None),
+    function.compose(
+      dynamic.tuple2(decode_some, decode_atom("shift", Shift)),
+      result.replace(_, Some(Shift)),
+    ),
+    function.compose(
+      dynamic.tuple2(decode_some, decode_atom("alt", Alt)),
+      result.replace(_, Some(Alt)),
+    ),
+    function.compose(
+      dynamic.tuple2(decode_some, decode_atom("control", Control)),
+      result.replace(_, Some(Control)),
+    ),
+  ])
 }
 
 fn keycode_decoder() -> Decoder(KeyCode) {
-  dynamic.element(
-    1,
-    dynamic.any([
-      dynamic.decode1(Character, dynamic.element(1, dynamic.string)),
-      decode_atom(Enter),
-      decode_atom(Backspace),
-      decode_atom(Left),
-      decode_atom(Right),
-      decode_atom(Down),
-      decode_atom(Up),
-      decode_atom(Unsupported),
-    ]),
-  )
-}
-
-fn key_decoder() -> Decoder(Event) {
-  dynamic.decode2(
-    Key,
-    keycode_decoder(),
-    dynamic.element(2, modifier_decoder()),
-  )
+  dynamic.any([
+    dynamic.tuple2(decode_atom("character", Character), dynamic.string)
+    |> function.compose(fn(maybe_pair) {
+      case maybe_pair {
+        Ok(#(_character, value)) -> Ok(Character(value))
+        Error(err) -> Error(err)
+      }
+    }),
+    decode_atom("enter", Enter),
+    decode_atom("backspace", Backspace),
+    decode_atom("left", Left),
+    decode_atom("right", Right),
+    decode_atom("down", Down),
+    decode_atom("up", Up),
+    decode_atom("unsupported", Unsupported),
+  ])
 }
 
 fn mouse_button_decoder() -> Decoder(MouseButton) {
-  dynamic.element(
-    1,
-    dynamic.any([
-      decode_atom(MouseLeft),
-      decode_atom(MouseRight),
-      decode_atom(MouseMiddle),
-    ]),
-  )
+  dynamic.any([
+    decode_atom("mouse_left", MouseLeft),
+    decode_atom("mouse_right", MouseRight),
+    decode_atom("mouse_middle", MouseMiddle),
+  ])
 }
 
 fn mouse_event_decoder() -> Decoder(MouseEvent) {
   dynamic.any([
-    dynamic.decode2(
-      MouseDown,
-      dynamic.element(1, mouse_button_decoder()),
-      dynamic.element(2, modifier_decoder()),
-    ),
-    dynamic.decode2(
-      MouseUp,
-      dynamic.element(1, mouse_button_decoder()),
-      dynamic.element(2, modifier_decoder()),
-    ),
-    dynamic.decode2(
-      Drag,
-      dynamic.element(1, mouse_button_decoder()),
-      dynamic.element(2, modifier_decoder()),
-    ),
-    dynamic.element(1, decode_atom(Moved)),
-    dynamic.element(1, decode_atom(ScrollDown)),
-    dynamic.element(1, decode_atom(ScrollUp)),
+    dynamic.tuple3(
+      decode_atom("mouse_down", MouseDown),
+      mouse_button_decoder(),
+      modifier_decoder(),
+    )
+    |> function.compose(fn(maybe_triple) {
+      case maybe_triple {
+        Ok(#(_mouse_down, button, modifier)) -> Ok(MouseDown(button, modifier))
+        Error(err) -> Error(err)
+      }
+    }),
+    dynamic.tuple3(
+      decode_atom("mouse_up", MouseUp),
+      mouse_button_decoder(),
+      modifier_decoder(),
+    )
+    |> function.compose(fn(maybe_triple) {
+      case maybe_triple {
+        Ok(#(_mouse_up, button, modifier)) -> Ok(MouseUp(button, modifier))
+        Error(err) -> Error(err)
+      }
+    }),
+    dynamic.tuple3(
+      decode_atom("drag", Drag),
+      mouse_button_decoder(),
+      modifier_decoder(),
+    )
+    |> function.compose(fn(maybe_triple) {
+      case maybe_triple {
+        Ok(#(_drag, button, modifier)) -> Ok(Drag(button, modifier))
+        Error(err) -> Error(err)
+      }
+    }),
+    decode_atom("moved", Moved),
+    decode_atom("scroll_down", ScrollDown),
+    decode_atom("scroll_up", ScrollUp),
   ])
-}
-
-fn mouse_decoder() -> Decoder(Event) {
-  dynamic.decode1(Mouse, mouse_event_decoder())
 }
 
 pub fn selector() -> Selector(Event) {
   process.new_selector()
-  // TODO:  It would be nicer to use `process.selecting_recordN`, but those
-  // don't handle decoders very nicely. If I find a workaround, or some other
-  // functions are added, swap to that
-  |> process.selecting_anything(fn(message) {
-    let decoder = dynamic.any([focus_decoder(), key_decoder(), mouse_decoder()])
-    decoder(message)
-    |> result.unwrap(Unknown(message))
-  })
+  |> process.selecting_record2(
+    atom.create_from_string("focus"),
+    fn(inner) {
+      inner
+      |> dynamic.any([decode_atom("gained", Gained), decode_atom("lost", Lost)])
+      |> result.map(Focus)
+      |> result.unwrap(Unknown("focus", inner))
+    },
+  )
+  |> process.selecting_record3(
+    atom.create_from_string("key"),
+    fn(first, second) {
+      let key_code = keycode_decoder()(first)
+      let modifier = modifier_decoder()(second)
+      case key_code, modifier {
+        Ok(code), Ok(mod) -> Key(code, mod)
+        _, _ -> Unknown("key", dynamic.from([first, second]))
+      }
+    },
+  )
+  |> process.selecting_record2(
+    atom.create_from_string("mouse"),
+    fn(inner) {
+      inner
+      |> mouse_event_decoder()
+      |> result.map(Mouse)
+      |> result.lazy_unwrap(fn() { Unknown("mouse", inner) })
+    },
+  )
+  |> process.selecting_record3(
+    atom.create_from_string("resize"),
+    fn(first, second) {
+      let columns = dynamic.int(first)
+      let rows = dynamic.int(second)
+      case columns, rows {
+        Ok(col), Ok(rows) -> Resize(col, rows)
+        _, _ -> Unknown("resize", dynamic.from([first, second]))
+      }
+    },
+  )
 }
 
 pub external fn clear() -> Nil =
@@ -239,7 +288,6 @@ pub fn start_listener(
     loop: loop,
   ))
 }
-
 // TODO:
 //  - test?
 //  - docs
