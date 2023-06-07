@@ -1,7 +1,7 @@
 -module(glerm_ffi).
 
 -export([listen/1, print/1, size/0, clear/0, move_to/2, draw/1, enable_raw_mode/0,
-         disable_raw_mode/0]).
+         disable_raw_mode/0, decode_atom/2]).
 
 -nifs([{listen, 1},
        {print, 1},
@@ -42,3 +42,8 @@ enable_raw_mode() ->
 
 disable_raw_mode() ->
   exit(nif_library_not_loaded).
+
+decode_atom(Src, Src) when is_atom(Src) ->
+  {ok, Src};
+decode_atom(Src, Val) ->
+  {error, [{decode_error, gleam@string:inspect(Src), gleam@dynamic:classify(Val), []}]}.

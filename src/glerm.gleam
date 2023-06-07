@@ -1,230 +1,245 @@
-import gleam/erlang/charlist
-import gleam/erlang/process
-import glerm/event_manager
+import gleam/bit_string
+import gleam/dynamic.{DecodeError, Decoder, Dynamic}
 import gleam/function
-import glerm/layout.{
-  LineBreak, Percent, Pixels, Rounded, Word, border, height, horizontal_box,
-  line_break, padding, row, style, text, text_style, vertical_box, width,
-}
-import glerm/renderer
-import glerm/event.{Backspace, Character, Control, Key}
-import glerm/runtime.{
-  Application, Command, Dispatch, External, Nothing, application,
-}
-import gleam/string
-import gleam/int
-import gleam/io
-import gleam/list
 import gleam/option.{Option, Some}
-import gleam_community/ansi
+import gleam/result
+import gleam/erlang/process.{Pid, Selector, Subject}
+import gleam/otp/actor
+import gleam/string
+import gleam/io
 
-pub fn initialize(application: Application(state, action)) -> Nil {
-  let renderer = renderer.create()
-  let runtime = runtime.create(renderer, application)
-  let _event_manager = event_manager.create(runtime)
-
-  Nil
+pub type Modifier {
+  Shift
+  Alt
+  Control
 }
 
-pub type State {
-  State(input: String, results: List(String), selected: Option(Int))
+pub type KeyCode {
+  Character(String)
+  Enter
+  Backspace
+  Left
+  Right
+  Down
+  Up
+  Unsupported
 }
 
-external fn os_cmd(cmd: charlist.Charlist) -> String =
-  "os" "cmd"
-
-fn grep(str: String) -> List(String) {
-  "rg --color=never --no-heading --with-filename --line-number --column --smart-case '" <> str <> "'"
-  |> charlist.from_string
-  |> os_cmd
-  |> string.split(on: "\n")
+pub type Resize {
+  Resize(Int, Int)
 }
 
-pub type Action {
-  SetResults(results: List(String))
-  UpdateSelected(index: Int)
+pub type MouseButton {
+  MouseLeft
+  MouseRight
+  MouseMiddle
 }
 
-pub fn main() {
-  let selector =
-    process.new_selector()
-    |> process.selecting_anything(function.identity)
-
-  // process.monitor_process(process.subject_owner(event_manager))
-  let app =
-    application(
-      State("", [], option.None),
-      fn(state, action) {
-        case action {
-          Dispatch(SetResults(results)) -> {
-            let selected = case results {
-              [] -> option.None
-              [_, ..] -> option.Some(0)
-            }
-            #(State(..state, results: results, selected: selected), Nothing)
-          }
-          Dispatch(UpdateSelected(index)) -> #(
-            State(..state, selected: option.Some(index)),
-            Nothing,
-          )
-          External(Key(Character("p"), Some(Control))) ->
-            case state.results, state.selected {
-              [], _ -> #(state, Nothing)
-              [_, ..], option.Some(n) if n == 0 -> #(state, Nothing)
-              [_, ..], option.Some(_n) -> #(
-                state,
-                Command(fn() {
-                  state.selected
-                  |> option.map(fn(selected) { selected - 1 })
-                  |> option.unwrap(0)
-                  |> UpdateSelected
-                  |> Dispatch
-                }),
-              )
-            }
-          External(Key(Character("n"), Some(Control))) ->
-            case list.length(state.results), state.selected {
-              0, _ -> #(state, Nothing)
-              length, option.Some(n) ->
-                case n == length - 2 {
-                  True -> #(state, Nothing)
-                  _ -> #(
-                    state,
-                    Command(fn() {
-                      state.selected
-                      |> option.map(fn(selected) { selected + 1 })
-                      |> option.unwrap(0)
-                      |> UpdateSelected
-                      |> Dispatch
-                    }),
-                  )
-                }
-            }
-          External(Key(Character(key), ..)) -> {
-            let new_state =
-              State(..state, input: state.input <> key, results: [])
-            let cmd = case string.length(new_state.input) >= 3 {
-              True ->
-                Command(fn() {
-                  let results = grep(new_state.input)
-                  Dispatch(SetResults(results))
-                })
-              False -> Nothing
-            }
-            #(new_state, cmd)
-          }
-          External(Key(Backspace, ..)) -> {
-            let new_state =
-              State(
-                ..state,
-                input: string.slice(
-                  state.input,
-                  0,
-                  int.max(string.length(state.input) - 1, 0),
-                ),
-                results: [],
-              )
-            let cmd = case string.length(new_state.input) >= 3 {
-              True ->
-                Command(fn() {
-                  let results = grep(new_state.input)
-                  Dispatch(SetResults(results))
-                })
-              False -> Nothing
-            }
-            #(new_state, cmd)
-          }
-          _ -> #(state, Nothing)
-        }
-      },
-      fn(state, _update) {
-        vertical_box(
-          style(),
-          [
-            vertical_box(
-              style()
-              |> border(Rounded(ansi.white)),
-              list.index_map(
-                state.results,
-                fn(index, result) {
-                  row(
-                    option.map(
-                      state.selected,
-                      fn(selected) {
-                        case selected == index {
-                          True ->
-                            text_style(
-                              style(),
-                              function.compose(ansi.bg_magenta, ansi.black),
-                            )
-                          False -> style()
-                        }
-                      },
-                    )
-                    |> option.unwrap(style()),
-                    result,
-                  )
-                },
-              ),
-            ),
-            text(
-              style()
-              |> border(Rounded(ansi.red))
-              |> height(Pixels(2)),
-              state.input <> "█",
-            ),
-          ],
-        )
-      },
-    )
-
-  // horizontal_box(
-  //   style()
-  //   |> border(Rounded("blue")),
-  //   [
-  //     text(
-  //       style()
-  //       |> border(Rounded("white"))
-  //       |> padding(5)
-  //       |> line_break(Word)
-  //       |> width(Percent(50)),
-  //       "this is a long string that should wrap in the box, but we'll see if that actually works",
-  //     ),
-  //     text(
-  //       style()
-  //       |> border(Rounded("red"))
-  //       |> width(Pixels(30)),
-  //       "world",
-  //     ),
-  //     vertical_box(
-  //       style(),
-  //       [
-  //         text(
-  //           style()
-  //           |> border(Rounded("green"))
-  //           |> height(Percent(75)),
-  //           "what",
-  //         ),
-  //         text(
-  //           style()
-  //           |> border(Rounded("yellow")),
-  //           "up",
-  //         ),
-  //       ],
-  //     ),
-  //   ],
-  // )
-  // vertical_box(
-  //   [],
-  //   [
-  //     vertical_box(
-  //       [Border(Rounded("white"))],
-  //       list.map(state.results, fn(result) { text([], result) }),
-  //     ),
-  //     text([Border(Rounded("red"))], state.input <> "█"),
-  //   ],
-  // )
-  initialize(app)
-
-  process.select_forever(selector)
+pub type MouseEvent {
+  MouseDown(button: MouseButton, modifier: Option(Modifier))
+  MouseUp(button: MouseButton, modifier: Option(Modifier))
+  Drag(button: MouseButton, modifier: Option(Modifier))
+  Moved
+  ScrollDown
+  ScrollUp
 }
+
+pub type FocusEvent {
+  Lost
+  Gained
+}
+
+pub type Event {
+  Focus(event: FocusEvent)
+  Key(key: KeyCode, modifier: Option(Modifier))
+  Mouse(event: MouseEvent)
+  Unknown(message: Dynamic)
+}
+
+external fn do_decode_atom(src: a, val: b) -> Result(b, List(DecodeError)) =
+  "glerm_ffi" "decode_atom"
+
+fn decode_atom(val: b) -> Decoder(b) {
+  fn(message: Dynamic) {
+    do_decode_atom(message, val)
+  }
+}
+
+fn modifier_decoder() -> Decoder(Option(Modifier)) {
+  dynamic.optional(dynamic.any([
+    decode_atom(Shift),
+    decode_atom(Alt),
+    decode_atom(Control),
+  ]))
+}
+
+fn focus_decoder() -> Decoder(Event) {
+  dynamic.decode1(
+    Focus,
+    dynamic.element(1, dynamic.any([decode_atom(Gained), decode_atom(Lost)])),
+  )
+}
+
+fn keycode_decoder() -> Decoder(KeyCode) {
+  dynamic.element(
+    1,
+    dynamic.any([
+      dynamic.decode1(Character, dynamic.element(1, dynamic.string)),
+      decode_atom(Enter),
+      decode_atom(Backspace),
+      decode_atom(Left),
+      decode_atom(Right),
+      decode_atom(Down),
+      decode_atom(Up),
+      decode_atom(Unsupported),
+    ]),
+  )
+}
+
+fn key_decoder() -> Decoder(Event) {
+  dynamic.decode2(
+    Key,
+    keycode_decoder(),
+    dynamic.element(2, modifier_decoder()),
+  )
+}
+
+fn mouse_button_decoder() -> Decoder(MouseButton) {
+  dynamic.element(
+    1,
+    dynamic.any([
+      decode_atom(MouseLeft),
+      decode_atom(MouseRight),
+      decode_atom(MouseMiddle),
+    ]),
+  )
+}
+
+fn mouse_event_decoder() -> Decoder(MouseEvent) {
+  dynamic.any([
+    dynamic.decode2(
+      MouseDown,
+      dynamic.element(1, mouse_button_decoder()),
+      dynamic.element(2, modifier_decoder()),
+    ),
+    dynamic.decode2(
+      MouseUp,
+      dynamic.element(1, mouse_button_decoder()),
+      dynamic.element(2, modifier_decoder()),
+    ),
+    dynamic.decode2(
+      Drag,
+      dynamic.element(1, mouse_button_decoder()),
+      dynamic.element(2, modifier_decoder()),
+    ),
+    dynamic.element(1, decode_atom(Moved)),
+    dynamic.element(1, decode_atom(ScrollDown)),
+    dynamic.element(1, decode_atom(ScrollUp)),
+  ])
+}
+
+fn mouse_decoder() -> Decoder(Event) {
+  dynamic.decode1(Mouse, mouse_event_decoder())
+}
+
+pub fn selector() -> Selector(Event) {
+  process.new_selector()
+  // TODO:  It would be nicer to use `process.selecting_recordN`, but those
+  // don't handle decoders very nicely. If I find a workaround, or some other
+  // functions are added, swap to that
+  |> process.selecting_anything(fn(message) {
+    let decoder = dynamic.any([focus_decoder(), key_decoder(), mouse_decoder()])
+    decoder(message)
+    |> result.unwrap(Unknown(message))
+  })
+}
+
+pub external fn clear() -> Nil =
+  "glerm_ffi" "clear"
+
+pub external fn draw(commands: List(#(Int, Int, String))) -> Result(Nil, Nil) =
+  "glerm_ffi" "draw"
+
+external fn listen(pid: Pid) -> Result(Nil, Nil) =
+  "glerm_ffi" "listen"
+
+pub external fn print(data: BitString) -> Result(Nil, Nil) =
+  "glerm_ffi" "print"
+
+pub external fn size() -> Result(#(Int, Int), Nil) =
+  "glerm_ffi" "size"
+
+pub external fn move_to(column: Int, row: Int) -> Nil =
+  "glerm_ffi" "move_to"
+
+pub external fn enable_raw_mode() -> Result(Nil, Nil) =
+  "glerm_ffi" "enable_raw_mode"
+
+pub external fn disable_raw_mode() -> Result(Nil, Nil) =
+  "glerm_ffi" "disable_raw_mode"
+
+pub type ListenerMessage(user_message) {
+  Term(Event)
+  User(user_message)
+}
+
+pub type ListenerSubject(user_message) =
+  Subject(ListenerMessage(user_message))
+
+pub type EventSubject =
+  Subject(Event)
+
+pub type ListenerSpec(state, user_message) {
+  ListenerSpec(
+    init: fn() -> #(state, Option(Selector(user_message))),
+    loop: fn(ListenerMessage(user_message), state) -> actor.Next(state),
+  )
+}
+
+pub fn start_listener_spec(
+  spec: ListenerSpec(state, user_message),
+) -> Result(ListenerSubject(user_message), actor.StartError) {
+  actor.start_spec(actor.Spec(
+    init: fn() {
+      let pid = process.self()
+      let assert #(state, user_selector) = spec.init()
+
+      let term_selector =
+        selector()
+        |> process.map_selector(Term)
+      let selector =
+        user_selector
+        |> option.map(fn(user) {
+          user
+          |> process.map_selector(User)
+          |> process.merge_selector(term_selector, _)
+        })
+        |> option.unwrap(term_selector)
+
+      process.start(fn() { listen(pid) }, True)
+
+      actor.Ready(state, selector)
+    },
+    init_timeout: 500,
+    loop: spec.loop,
+  ))
+}
+
+pub fn start_listener(
+  initial_state: state,
+  loop: fn(Event, state) -> actor.Next(state),
+) -> Result(EventSubject, actor.StartError) {
+  actor.start_spec(actor.Spec(
+    init: fn() {
+      let pid = process.self()
+      process.start(fn() { listen(pid) }, True)
+      actor.Ready(initial_state, selector())
+    },
+    init_timeout: 500,
+    loop: loop,
+  ))
+}
+
+// TODO:
+//  - test?
+//  - docs
