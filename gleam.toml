@@ -10,11 +10,10 @@ description = "A TUI library for gleam"
 # links = [{ title = "Website", href = "https://gleam.run" }]
 
 [dependencies]
-gleam_stdlib = "~> 0.25"
-ex_termbox = "~> 1.0"
-gleam_erlang = "~> 0.17"
+gleam_stdlib = "~> 0.28"
+gleam_erlang = "~> 0.19"
 gleam_otp = "~> 0.5"
-shellout = "~> 1.0"
+gleam_community_ansi = "~> 1.1"
 
 [dev-dependencies]
 gleeunit = "~> 0.7"

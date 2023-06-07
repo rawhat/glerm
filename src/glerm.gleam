@@ -1,31 +1,24 @@
 import gleam/erlang/charlist
 import gleam/erlang/process
-import gleam/function
 import glerm/event_manager
+import gleam/function
 import glerm/layout.{
-  LineBreak, Percent, Pixels, Rounded, Word, background, border, height,
-  horizontal_box, line_break, padding, row, style, text, vertical_box, width,
+  LineBreak, Percent, Pixels, Rounded, Word, border, height, horizontal_box,
+  line_break, padding, row, style, text, text_style, vertical_box, width,
 }
 import glerm/renderer
-import glerm/event.{Backspace, Key}
+import glerm/event.{Backspace, Character, Control, Key}
 import glerm/runtime.{
-  Application, Command, Dispatch, External, None, application,
+  Application, Command, Dispatch, External, Nothing, application,
 }
 import gleam/string
 import gleam/int
 import gleam/io
 import gleam/list
-import gleam/option.{Option}
-
-external fn termbox_init() -> Nil =
-  "Elixir.ExTermbox.Bindings" "init"
-
-// external fn write_character(row: Int, col: Int, character: Int) -> Nil =
-//   "Elixir.Glerm.Helpers" "write_character"
+import gleam/option.{Option, Some}
+import gleam_community/ansi
 
 pub fn initialize(application: Application(state, action)) -> Nil {
-  termbox_init()
-
   let renderer = renderer.create()
   let runtime = runtime.create(renderer, application)
   let _event_manager = event_manager.create(runtime)
@@ -68,17 +61,17 @@ pub fn main() {
               [] -> option.None
               [_, ..] -> option.Some(0)
             }
-            #(State(..state, results: results, selected: selected), None)
+            #(State(..state, results: results, selected: selected), Nothing)
           }
           Dispatch(UpdateSelected(index)) -> #(
             State(..state, selected: option.Some(index)),
-            None,
+            Nothing,
           )
-          External(Key("p", control: True, ..)) ->
+          External(Key(Character("p"), Some(Control))) ->
             case state.results, state.selected {
-              [], _ -> #(state, None)
-              [_, ..], option.Some(n) if n == 0 -> #(state, None)
-              [_, ..], option.Some(n) -> #(
+              [], _ -> #(state, Nothing)
+              [_, ..], option.Some(n) if n == 0 -> #(state, Nothing)
+              [_, ..], option.Some(_n) -> #(
                 state,
                 Command(fn() {
                   state.selected
@@ -89,12 +82,12 @@ pub fn main() {
                 }),
               )
             }
-          External(Key("n", control: True, ..)) ->
+          External(Key(Character("n"), Some(Control))) ->
             case list.length(state.results), state.selected {
-              0, _ -> #(state, None)
+              0, _ -> #(state, Nothing)
               length, option.Some(n) ->
-                case n == length - 1 {
-                  True -> #(state, None)
+                case n == length - 2 {
+                  True -> #(state, Nothing)
                   _ -> #(
                     state,
                     Command(fn() {
@@ -107,7 +100,7 @@ pub fn main() {
                   )
                 }
             }
-          External(Key(key, ..)) -> {
+          External(Key(Character(key), ..)) -> {
             let new_state =
               State(..state, input: state.input <> key, results: [])
             let cmd = case string.length(new_state.input) >= 3 {
@@ -116,11 +109,11 @@ pub fn main() {
                   let results = grep(new_state.input)
                   Dispatch(SetResults(results))
                 })
-              False -> None
+              False -> Nothing
             }
             #(new_state, cmd)
           }
-          External(Backspace) -> {
+          External(Key(Backspace, ..)) -> {
             let new_state =
               State(
                 ..state,
@@ -137,11 +130,11 @@ pub fn main() {
                   let results = grep(new_state.input)
                   Dispatch(SetResults(results))
                 })
-              False -> None
+              False -> Nothing
             }
             #(new_state, cmd)
           }
-          _ -> #(state, None)
+          _ -> #(state, Nothing)
         }
       },
       fn(state, _update) {
@@ -150,7 +143,7 @@ pub fn main() {
           [
             vertical_box(
               style()
-              |> border(Rounded("white")),
+              |> border(Rounded(ansi.white)),
               list.index_map(
                 state.results,
                 fn(index, result) {
@@ -159,7 +152,11 @@ pub fn main() {
                       state.selected,
                       fn(selected) {
                         case selected == index {
-                          True -> background(style(), "cyan")
+                          True ->
+                            text_style(
+                              style(),
+                              function.compose(ansi.bg_magenta, ansi.black),
+                            )
                           False -> style()
                         }
                       },
@@ -172,7 +169,7 @@ pub fn main() {
             ),
             text(
               style()
-              |> border(Rounded("red"))
+              |> border(Rounded(ansi.red))
               |> height(Pixels(2)),
               state.input <> "█",
             ),

@@ -1,24 +1,28 @@
+import gleam/function
 import gleam/map.{Map}
 
-external fn get_width() -> Result(Int, Nil) =
-  "Elixir.ExTermbox.Bindings" "width"
-
-external fn get_height() -> Result(Int, Nil) =
-  "Elixir.ExTermbox.Bindings" "height"
+external fn get_size() -> Result(#(Int, Int), Nil) =
+  "glerm_ffi" "size"
 
 pub type Position {
   Position(column: Int, row: Int)
 }
 
 pub fn get_dimensions() -> Position {
-  assert Ok(width) = get_width()
-  assert Ok(height) = get_height()
+  let assert Ok(#(columns, rows)) = get_size()
 
-  Position(width - 1, height - 1)
+  Position(columns - 1, rows - 1)
 }
 
+pub type AnsiStyle =
+  fn(String) -> String
+
 pub type Cell {
-  Cell(value: String, foreground: String, background: String)
+  Cell(value: String, style: AnsiStyle)
+}
+
+pub fn empty_cell() -> Cell {
+  Cell(value: " ", style: function.identity)
 }
 
 pub type Canvas =

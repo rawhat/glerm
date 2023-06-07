@@ -1,21 +1,23 @@
 import gleam/erlang/process.{Pid, Subject}
 import gleam/otp/actor
-import glerm/event.{Event, Key}
+import glerm/event.{Character, Control, Event, Key}
 import glerm/runtime.{External, Message}
 import gleam/io
+import gleam/option.{Some}
+import gleam/result
+import glerm/renderer
 
-external fn start_event_manager() -> Result(Pid, Nil) =
-  "Elixir.ExTermbox.EventManager" "start_link"
+external fn listen(pid: Pid) -> Result(Nil, Nil) =
+  "glerm_ffi" "listen"
 
-external fn subscribe(pid: Pid) -> Nil =
-  "Elixir.ExTermbox.EventManager" "subscribe"
+external fn enable_raw_mode() -> Result(Nil, Nil) =
+  "glerm_ffi" "enable_raw_mode"
 
-external fn shutdown() -> Nil =
-  "Elixir.ExTermbox.Bindings" "shutdown"
+external fn disable_raw_mode() -> Result(Nil, Nil) =
+  "glerm_ffi" "disable_raw_mode"
 
 pub fn create(runtime: Subject(Message(action))) -> Subject(Event) {
-  assert Ok(_pid) = start_event_manager()
-  assert Ok(event_listener) =
+  let assert Ok(event_listener) =
     actor.start_spec(actor.Spec(
       init: fn() {
         let subject = process.new_subject()
@@ -23,16 +25,23 @@ pub fn create(runtime: Subject(Message(action))) -> Subject(Event) {
         let selector =
           process.new_selector()
           |> process.selecting_anything(event.decode)
-          |> process.map_selector(event.convert)
 
-        subscribe(process.subject_owner(subject))
+        // TODO: handle errors?
+        process.start(
+          fn() {
+            let _ = enable_raw_mode()
+            let _ = listen(process.subject_owner(subject))
+            disable_raw_mode()
+          },
+          True,
+        )
         actor.Ready(Nil, selector)
       },
       init_timeout: 200,
       loop: fn(msg, state) {
         case msg {
-          Key("c", True, False, False) -> {
-            shutdown()
+          Key(Character("c"), Some(Control)) -> {
+            renderer.clear()
             actor.Stop(process.Normal)
           }
           event -> {

@@ -2,7 +2,7 @@ import gleam/erlang/process.{Subject}
 import gleam/otp/actor
 import glerm/layout.{Element}
 import glerm/renderer.{Action, Render}
-import glerm/event.{Event, WindowResize}
+import glerm/event.{Event}
 import gleam/function
 import gleam/io
 
@@ -14,7 +14,7 @@ pub type Message(action) {
 
 pub type Command(action) {
   Command(action: fn() -> Message(action))
-  None
+  Nothing
 }
 
 pub type Update(state, action) =
@@ -49,7 +49,7 @@ pub fn create(
 ) -> Subject(Message(action)) {
   let initial_view = application.view(application.state, application.update)
   process.send(renderer, Render(initial_view))
-  assert Ok(runtime) =
+  let assert Ok(runtime) =
     actor.start_spec(actor.Spec(
       init: fn() {
         let subject = process.new_subject()
@@ -62,12 +62,12 @@ pub fn create(
       init_timeout: 500,
       loop: fn(msg, state) {
         let #(new_state, command) = application.update(state.state, msg)
-        case new_state == state.state, msg == External(WindowResize) {
-          True, False -> {
+        case new_state == state.state {
+          True -> {
             run_command(state.subject, command)
             actor.Continue(state)
           }
-          _, _ -> {
+          _ -> {
             let new_view = application.view(new_state, application.update)
             process.send(renderer, Render(new_view))
             run_command(state.subject, command)
@@ -81,7 +81,7 @@ pub fn create(
 
 fn run_command(subject: Subject(Message(action)), action: Command(action)) {
   case action {
-    None -> Nil
+    Nothing -> Nil
     Command(command) -> {
       process.start(
         fn() {

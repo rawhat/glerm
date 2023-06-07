@@ -7,6 +7,7 @@ import glerm/layout.{
 import gleam/string
 import glerm/screen.{Cell, Position}
 import gleam/io
+import gleam_community/ansi
 
 // pub fn render_text_test() {
 //   let bounding_box = BoundingBox(Position(0, 0), Position(5, 0))
@@ -22,7 +23,7 @@ pub fn render_horizontal_box_test() {
   let str =
     horizontal_box(
       style()
-      |> border(Rounded("white")),
+      |> border(Rounded(ansi.white)),
       [text(style(), "hi"), text(style(), "mom")],
     )
     |> do_build(bounding_box, map.new())
@@ -44,7 +45,7 @@ pub fn render_vertical_box_test() {
   let str =
     vertical_box(
       style()
-      |> border(Rounded("white")),
+      |> border(Rounded(ansi.white)),
       [text(style(), "hi"), text(style(), "mom")],
     )
     |> do_build(bounding_box, map.new())

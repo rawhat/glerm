@@ -2,20 +2,18 @@
 # You typically do not need to edit this file
 
 packages = [
-  { name = "castore", version = "0.1.20", build_tools = ["mix"], requirements = [], otp_app = "castore", source = "hex", outer_checksum = "A020B7650529C986C454A4035B6B13A328E288466986307BEA3AADB4C95AC98A" },
-  { name = "elixir_make", version = "0.7.2", build_tools = ["mix"], requirements = ["castore"], otp_app = "elixir_make", source = "hex", outer_checksum = "05FB44ABF9582381C2EB1B73D485A55288C581071DE0EE3EE1084EE69D6A8E5F" },
-  { name = "ex_termbox", version = "1.0.2", build_tools = ["mix", "make"], requirements = ["elixir_make"], otp_app = "ex_termbox", source = "hex", outer_checksum = "CA7B14D1019F96466A65BA08BD6CBF46E8B16F87339EF0ED211BA0641F304807" },
-  { name = "gleam_erlang", version = "0.17.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_erlang", source = "hex", outer_checksum = "BAAA84F5BCC4477E809BA3E03BB3009A3894A6544C1511626C44408E39DB2AE6" },
-  { name = "gleam_otp", version = "0.5.2", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_stdlib"], otp_app = "gleam_otp", source = "hex", outer_checksum = "24B88BF1D5B8DEC2525C00ECB65B96D2FD4DC66D8B2BB4D7AD4D12B2CE2A9988" },
-  { name = "gleam_stdlib", version = "0.25.0", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "AD0F89928E0B919C8F8EDF640484633B28DBF88630A9E6AE504617A3E3E5B9A2" },
-  { name = "gleeunit", version = "0.8.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "A1170754BF54F5DD6E9EF392FB1DC612528B007CCBE41B52F0C5453254708490" },
-  { name = "shellout", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_stdlib"], otp_app = "shellout", source = "hex", outer_checksum = "310662075CDCB6E3928B03E3FD371B1DDCD691E1C709E606AB02195E36675D4E" },
+  { name = "gleam_bitwise", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_bitwise", source = "hex", outer_checksum = "6064699EFBABB1CA392DCB193D0E8B402FB042B4B46857B01E6875E643B57F54" },
+  { name = "gleam_community_ansi", version = "1.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_community_colour", "gleam_bitwise"], otp_app = "gleam_community_ansi", source = "hex", outer_checksum = "6E4E0CF2B207C1A7FCD3C21AA43514D67BC7004F21F82045CDCCE6C727A14862" },
+  { name = "gleam_community_colour", version = "1.1.0", build_tools = ["gleam"], requirements = ["gleam_bitwise", "gleam_stdlib"], otp_app = "gleam_community_colour", source = "hex", outer_checksum = "D27CE357ECB343929A8CEC3FBA0B499943A47F0EE1F589EE16AFC2DC21C61E5B" },
+  { name = "gleam_erlang", version = "0.19.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_erlang", source = "hex", outer_checksum = "720D1E0A0CEBBD51C4AA88501D1D4FBFEF4AA7B3332C994691ED944767A52582" },
+  { name = "gleam_otp", version = "0.5.3", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_erlang"], otp_app = "gleam_otp", source = "hex", outer_checksum = "6E705B69464237353E0380AC8143BDB29A3F0BF6168755D5F2D6E55A34A8B077" },
+  { name = "gleam_stdlib", version = "0.28.2", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "088E334A00C9530D4B194F31406E51B6E4E4697C6A380D11591E60CC2F239724" },
+  { name = "gleeunit", version = "0.10.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "ECEA2DE4BE6528D36AFE74F42A21CDF99966EC36D7F25DEB34D47DD0F7977BAF" },
 ]
 
 [requirements]
-ex_termbox = "~> 1.0"
-gleam_erlang = "~> 0.17"
+gleam_community_ansi = "~> 1.1"
+gleam_erlang = "~> 0.19"
 gleam_otp = "~> 0.5"
-gleam_stdlib = "~> 0.25"
+gleam_stdlib = "~> 0.28"
 gleeunit = "~> 0.7"
-shellout = "~> 1.0"

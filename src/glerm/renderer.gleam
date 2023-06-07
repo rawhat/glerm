@@ -1,12 +1,16 @@
 import gleam/erlang/atom.{Atom}
 import gleam/erlang/charlist.{Charlist}
 import gleam/erlang/process.{Subject}
+import gleam/function
 import gleam/int
+import gleam/io
 import gleam/list
 import gleam/otp/actor
 import gleam/map
 import glerm/layout.{Element}
+import gleam/result
 import glerm/screen.{Canvas, Cell, Position}
+import gleam_community/ansi
 
 pub type RendererState {
   RendererState(cursor: Position, canvas: Canvas)
@@ -30,13 +34,13 @@ pub type Action {
 }
 
 pub fn create() -> Subject(Action) {
-  assert Ok(renderer) =
+  let assert Ok(renderer) =
     actor.start_spec(actor.Spec(
       init: fn() {
         let selector = process.new_selector()
         let initial_state =
           RendererState(cursor: Position(0, 0), canvas: map.new())
-        render(initial_state.canvas)
+        clear()
         actor.Ready(initial_state, selector)
       },
       init_timeout: 50,
@@ -48,7 +52,7 @@ pub fn create() -> Subject(Action) {
               canvas: map.insert(
                 state.canvas,
                 position,
-                Cell(text, "white", "default"),
+                Cell(text, function.identity),
               ),
             )
           WriteCharacter(char) -> {
@@ -57,7 +61,7 @@ pub fn create() -> Subject(Action) {
               canvas: map.insert(
                 state.canvas,
                 state.cursor,
-                Cell(char_code_to_string(char), "white", "default"),
+                Cell(char_code_to_string(char), function.identity),
               ),
               cursor: new_cursor,
             )
@@ -68,7 +72,7 @@ pub fn create() -> Subject(Action) {
               canvas: map.insert(
                 state.canvas,
                 state.cursor,
-                Cell(str, "white", "default"),
+                Cell(str, function.identity),
               ),
               cursor: new_cursor,
             )
@@ -91,30 +95,43 @@ pub fn create() -> Subject(Action) {
           }
           Render(tree) -> RendererState(..state, canvas: layout.build(tree))
         }
-        render(updated_state.canvas)
+        render(state.canvas, updated_state.canvas)
         actor.Continue(updated_state)
       },
     ))
   renderer
 }
 
-fn render(canvas: Canvas) -> Nil {
-  clear()
-
-  canvas
+fn render(prev: Canvas, next: Canvas) -> Nil {
+  let empty_cells =
+    prev
+    |> map.to_list
+    |> list.filter(fn(pair) {
+      let assert #(position, _cell) = pair
+      next
+      |> map.get(position)
+      |> result.is_error
+    })
+    |> list.map(fn(pair) {
+      let assert #(position, _cell) = pair
+      #(position, screen.empty_cell())
+    })
+  next
   |> map.to_list
-  |> list.each(fn(pair) {
-    assert #(position, cell) = pair
-    let color = atom.create_from_string(cell.foreground)
-    write_charlist(
-      position.column,
-      position.row,
-      charlist.from_string(cell.value),
-      atom.create_from_string(cell.foreground),
-      atom.create_from_string(cell.background),
-    )
+  |> list.filter(fn(pair) {
+    let assert #(position, value) = pair
+    case map.get(prev, position) {
+      Ok(prev_value) -> value != prev_value
+      _ -> True
+    }
   })
-  present()
+  |> list.append(empty_cells)
+  |> list.each(fn(pair) {
+    let assert #(position, cell) = pair
+    let text = cell.style(cell.value)
+    move_to(position.column, position.row)
+    print(text)
+  })
 }
 
 fn move_cursor(existing: Position, direction: Direction) -> Position {
@@ -143,30 +160,21 @@ fn move_cursor(existing: Position, direction: Direction) -> Position {
   }
 }
 
-pub external fn char_code_to_string(code: Int) -> String =
-  "Elixir.Glerm.Helpers" "char_code_to_string"
+external fn binary_to_list(bs: BitString) -> String =
+  "erlang" "binary_to_list"
 
-external fn clear() -> Nil =
-  "Elixir.ExTermbox.Bindings" "clear"
-
-external fn write_charlist(
-  row: Int,
-  col: Int,
-  charlist: Charlist,
-  foreground: Atom,
-  background: Atom,
-) -> Nil =
-  "Elixir.Glerm.Helpers" "write_charlist"
-
-external fn present() -> Nil =
-  "Elixir.ExTermbox.Bindings" "present"
-
-fn draw_cursor(position: Position) -> Nil {
-  write_charlist(
-    position.column,
-    position.row,
-    charlist.from_string("█"),
-    atom.create_from_string("white"),
-    atom.create_from_string("default"),
-  )
+fn char_code_to_string(code: Int) -> String {
+  binary_to_list(<<code>>)
 }
+
+pub external fn clear() -> Nil =
+  "glerm_ffi" "clear"
+
+external fn move_to(column: Int, row: Int) -> Nil =
+  "glerm_ffi" "move_to"
+
+external fn print(data: String) -> Nil =
+  "glerm_ffi" "print"
+
+external fn draw(commands: List(#(Int, Int, String))) -> Result(Nil, Nil) =
+  "glerm_ffi" "draw"

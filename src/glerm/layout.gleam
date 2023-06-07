@@ -3,13 +3,15 @@ import gleam/io
 import gleam/iterator
 import gleam/list
 import gleam/float
+import gleam/function
 import gleam/map
 import gleam/option.{None, Option, Some}
 import gleam/order.{Eq, Gt, Lt}
 import gleam/result
 import gleam/string
 import gleam/string_builder
-import glerm/screen.{Canvas, Cell, Position}
+import glerm/screen.{AnsiStyle, Canvas, Cell, Position}
+import gleam_community/ansi
 
 pub type Orientation {
   Horizontal
@@ -27,8 +29,8 @@ pub type Overflow {
 }
 
 pub type Border {
-  Square(String)
-  Rounded(String)
+  Square(AnsiStyle)
+  Rounded(AnsiStyle)
 }
 
 pub type LineBreak {
@@ -38,7 +40,7 @@ pub type LineBreak {
 
 pub type Style {
   Style(
-    background: Option(String),
+    text: Option(AnsiStyle),
     border: Option(Border),
     padding: Option(Int),
     width: Option(Dimension),
@@ -50,7 +52,7 @@ pub type Style {
 
 pub fn style() -> Style {
   Style(
-    background: None,
+    text: None,
     border: None,
     padding: None,
     width: None,
@@ -84,8 +86,8 @@ pub fn line_break(style: Style, line_break: LineBreak) -> Style {
   Style(..style, line_break: Some(line_break))
 }
 
-pub fn background(style: Style, color: String) -> Style {
-  Style(..style, background: Some(color))
+pub fn text_style(style: Style, ansi_style: AnsiStyle) -> Style {
+  Style(..style, text: Some(ansi_style))
 }
 
 // Center
@@ -152,7 +154,7 @@ pub fn do_build(
           #(map.new(), total_width - 1),
           fn(state, entry) {
             let #(widths, remaining) = state
-            assert #(index, Ok(width)) = entry
+            let assert #(index, Ok(width)) = entry
             case width {
               Percent(amount) -> {
                 let size = percentage(remaining, amount)
@@ -252,7 +254,7 @@ pub fn do_build(
           #(map.new(), total_height),
           fn(state, entry) {
             let #(heights, remaining) = state
-            assert #(index, Ok(height)) = entry
+            let assert #(index, Ok(height)) = entry
             case height {
               Percent(amount) -> {
                 let size = percentage(remaining, amount)
@@ -353,7 +355,7 @@ pub fn do_build(
                     bounding_box.top_left.column + col,
                     bounding_box.top_left.row + row,
                   ),
-                Cell(char, "white", option.unwrap(style.background, "default")),
+                  Cell(char, option.unwrap(style.text, function.identity)),
                 )
               },
             )
@@ -388,7 +390,7 @@ pub fn do_build(
                   bounding_box.top_left.column + col,
                   bounding_box.top_left.row + row,
                 ),
-                Cell(char, "white", option.unwrap(style.background, "default")),
+                Cell(char, option.unwrap(style.text, function.identity)),
               )
             })
           })
@@ -413,7 +415,7 @@ pub fn do_build(
               bounding_box.top_left.column + col,
               bounding_box.top_left.row,
             ),
-            Cell(char, "white", option.unwrap(style.background, "default")),
+            Cell(char, option.unwrap(style.text, function.identity)),
           )
         },
       )
@@ -453,58 +455,46 @@ fn add_border(
     Position(bounding_box.top_left.column, bounding_box.bottom_right.row)
   let bottom_right = bounding_box.bottom_right
 
-  let color_string = case border {
-    Square(color) | Rounded(color) -> color
+  let style = case border {
+    Square(style) | Rounded(style) -> style
   }
 
   let top_border =
     iterator.range(top_left.column, top_right.column)
     |> iterator.map(fn(column) {
-      #(
-        Position(column, top_left.row),
-        Cell(horizontal_border, color_string, "default"),
-      )
+      #(Position(column, top_left.row), Cell(horizontal_border, style))
     })
 
   let right_border =
     iterator.range(top_right.row, bottom_right.row)
     |> iterator.map(fn(row) {
-      #(
-        Position(top_right.column, row),
-        Cell(vertical_border, color_string, "default"),
-      )
+      #(Position(top_right.column, row), Cell(vertical_border, style))
     })
 
   let bottom_border =
     iterator.range(bottom_left.column, bottom_right.column)
     |> iterator.map(fn(column) {
-      #(
-        Position(column, bottom_left.row),
-        Cell(horizontal_border, color_string, "default"),
-      )
+      #(Position(column, bottom_left.row), Cell(horizontal_border, style))
     })
 
   let left_border =
     iterator.range(top_left.row, bottom_left.row)
     |> iterator.map(fn(row) {
-      #(
-        Position(top_left.column, row),
-        Cell(vertical_border, color_string, "default"),
-      )
+      #(Position(top_left.column, row), Cell(vertical_border, style))
     })
 
   let corners = case border {
     Square(_color) -> [
-      #(top_left, Cell(square_top_left, color_string, "default")),
-      #(top_right, Cell(square_top_right, color_string, "default")),
-      #(bottom_right, Cell(square_bottom_right, color_string, "default")),
-      #(bottom_left, Cell(square_bottom_left, color_string, "default")),
+      #(top_left, Cell(square_top_left, style)),
+      #(top_right, Cell(square_top_right, style)),
+      #(bottom_right, Cell(square_bottom_right, style)),
+      #(bottom_left, Cell(square_bottom_left, style)),
     ]
     Rounded(_color) -> [
-      #(top_left, Cell(rounded_top_left, color_string, "default")),
-      #(top_right, Cell(rounded_top_right, color_string, "default")),
-      #(bottom_right, Cell(rounded_bottom_right, color_string, "default")),
-      #(bottom_left, Cell(rounded_bottom_left, color_string, "default")),
+      #(top_left, Cell(rounded_top_left, style)),
+      #(top_right, Cell(rounded_top_right, style)),
+      #(bottom_right, Cell(rounded_bottom_right, style)),
+      #(bottom_left, Cell(rounded_bottom_left, style)),
     ]
   }
 
