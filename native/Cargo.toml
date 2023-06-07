@@ -13,4 +13,3 @@ crate-type = ["cdylib"]
 crossterm = { version = "0.26.1", features = ["event-stream"] }
 rustler = "0.28.0"
 serde = "1.0.163"
-termion = "2.0.1"
