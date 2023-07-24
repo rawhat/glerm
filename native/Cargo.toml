@@ -11,5 +11,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 crossterm = { version = "0.26.1" }
-rustler = "0.28.0"
+rustler = "0.29.1"
 serde = "1.0.163"

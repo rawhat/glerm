@@ -27,7 +27,7 @@ init() ->
         filename:join(Priv, "linux");
       "win32" ->
         filename:join(Priv, "windows");
-      "x86_64-apple-drawin" ++ _ ->
+      "x86_64-apple-darwin" ++ _ ->
         filename:join(Priv, "macos")
     end,
   Path = filename:join(ArchPath, libglerm),
