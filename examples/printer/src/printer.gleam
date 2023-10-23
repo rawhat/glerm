@@ -50,7 +50,7 @@ pub fn main() {
             let assert Ok(_) =
               glerm.print(bit_string.from_string(string.inspect(msg)))
             // Go down to the next row for the subsequent message
-            actor.Continue(state + 1)
+            actor.continue(state + 1)
           }
         }
       },

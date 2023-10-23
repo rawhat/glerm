@@ -222,32 +222,32 @@ pub fn selector() -> Selector(Event) {
 }
 
 /// Fully clears the terminal window
-pub external fn clear() -> Nil =
-  "glerm_ffi" "clear"
+@external(erlang, "glerm_ffi", "clear")
+pub fn clear() -> Nil
 
 /// Write some string to the screen at the given #(column, row) coordinate
-pub external fn draw(commands: List(#(Int, Int, String))) -> Result(Nil, Nil) =
-  "glerm_ffi" "draw"
+@external(erlang, "glerm_ffi", "draw")
+pub fn draw(commands: List(#(Int, Int, String))) -> Result(Nil, Nil)
 
 /// This is the "meat" of the library. This will fire up the NIF, which spawns
 /// a thread to read for terminal events. The `Pid` provided here is where the
 /// messages will be sent.
-external fn listen(pid: Pid) -> Result(Nil, Nil) =
-  "glerm_ffi" "listen"
+@external(erlang, "glerm_ffi", "listen")
+fn listen(pid: Pid) -> Result(Nil, Nil)
 
 /// Writes the given text wherever the cursor is
-pub external fn print(data: BitString) -> Result(Nil, Nil) =
-  "glerm_ffi" "print"
+@external(erlang, "glerm_ffi", "print")
+pub fn print(data: BitString) -> Result(Nil, Nil)
 
 /// Gives back the #(column, row) count of the current terminal. This can be
 /// called to get the initial size, and then updated when `Resize` events
 /// come in.
-pub external fn size() -> Result(#(Int, Int), Nil) =
-  "glerm_ffi" "size"
+@external(erlang, "glerm_ffi", "size")
+pub fn size() -> Result(#(Int, Int), Nil)
 
 /// Moves the cursor to the given location
-pub external fn move_to(column: Int, row: Int) -> Nil =
-  "glerm_ffi" "move_to"
+@external(erlang, "glerm_ffi", "move_to")
+pub fn move_to(column: Int, row: Int) -> Nil
 
 /// Enables "raw mode" for the terminal. This will do a better job than I can
 /// at explaining what all that entails:
@@ -256,38 +256,38 @@ pub external fn move_to(column: Int, row: Int) -> Nil =
 ///
 /// If you want to control the entire screen, capture all input events, and
 /// place the cursor anywhere, this is what you want.
-pub external fn enable_raw_mode() -> Result(Nil, Nil) =
-  "glerm_ffi" "enable_raw_mode"
+@external(erlang, "glerm_ffi", "enable_raw_mode")
+pub fn enable_raw_mode() -> Result(Nil, Nil)
 
 /// Turns off raw mode. This will disable the features described in
 /// `enable_raw_mode`.
-pub external fn disable_raw_mode() -> Result(Nil, Nil) =
-  "glerm_ffi" "disable_raw_mode"
+@external(erlang, "glerm_ffi", "disable_raw_mode")
+pub fn disable_raw_mode() -> Result(Nil, Nil)
 
 /// This will create a new terminal "window" that you can interact with. This
 /// will preserve the user's existing terminal when exiting the program, or
 /// calling `leave_alternate_screen`.
-pub external fn enter_alternate_screen() -> Result(Nil, Nil) =
-  "glerm_ffi" "enter_alternate_screen"
+@external(erlang, "glerm_ffi", "enter_alternate_screen")
+pub fn enter_alternate_screen() -> Result(Nil, Nil)
 
 /// See:  `enter_alternate_screen`
-pub external fn leave_alternate_screen() -> Result(Nil, Nil) =
-  "glerm_ffi" "leave_alternate_screen"
+@external(erlang, "glerm_ffi", "leave_alternate_screen")
+pub fn leave_alternate_screen() -> Result(Nil, Nil)
 
 /// This enables the capturing of mouse events. Without this, those event types
 /// will not be emitted by the NIF.
-pub external fn enable_mouse_capture() -> Result(Nil, Nil) =
-  "glerm_ffi" "enable_mouse_capture"
+@external(erlang, "glerm_ffi", "enable_mouse_capture")
+pub fn enable_mouse_capture() -> Result(Nil, Nil)
 
 /// This will stop the capture of mouse events in the terminal.
-pub external fn disable_mouse_capture() -> Result(Nil, Nil) =
-  "glerm_ffi" "disable_mouse_capture"
+@external(erlang, "glerm_ffi", "disable_mouse_capture")
+pub fn disable_mouse_capture() -> Result(Nil, Nil)
 
-pub external fn cursor_position() -> Result(#(Int, Int), Nil) =
-  "glerm_ffi" "cursor_position"
+@external(erlang, "glerm_ffi", "cursor_position")
+pub fn cursor_position() -> Result(#(Int, Int), Nil)
 
-pub external fn clear_current_line() -> Result(Nil, Nil) =
-  "glerm_ffi" "clear_current_line"
+@external(erlang, "glerm_ffi", "clear_current_line")
+pub fn clear_current_line() -> Result(Nil, Nil)
 
 pub type ListenerMessage(user_message) {
   Term(Event)
@@ -303,7 +303,8 @@ pub type EventSubject =
 pub type ListenerSpec(state, user_message) {
   ListenerSpec(
     init: fn() -> #(state, Option(Selector(user_message))),
-    loop: fn(ListenerMessage(user_message), state) -> actor.Next(state),
+    loop: fn(ListenerMessage(user_message), state) ->
+      actor.Next(ListenerMessage(user_message), state),
   )
 }
 
@@ -343,7 +344,7 @@ pub fn start_listener_spec(
 /// actor to receive additional user-defined messages, see `start_listener_spec`
 pub fn start_listener(
   initial_state: state,
-  loop: fn(Event, state) -> actor.Next(state),
+  loop: fn(Event, state) -> actor.Next(ListenerMessage(user_message), state),
 ) -> Result(EventSubject, actor.StartError) {
   actor.start_spec(actor.Spec(
     init: fn() {
@@ -352,7 +353,12 @@ pub fn start_listener(
       actor.Ready(initial_state, selector())
     },
     init_timeout: 500,
-    loop: loop,
+    loop: fn(msg, state) {
+      case loop(msg, state) {
+        actor.Continue(state, _selector) -> actor.continue(state)
+        actor.Stop(reason) -> actor.Stop(reason)
+      }
+    },
   ))
 }
 // TODO:
