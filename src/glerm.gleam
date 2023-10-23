@@ -283,6 +283,12 @@ pub external fn enable_mouse_capture() -> Result(Nil, Nil) =
 pub external fn disable_mouse_capture() -> Result(Nil, Nil) =
   "glerm_ffi" "disable_mouse_capture"
 
+pub external fn cursor_position() -> Result(#(Int, Int), Nil) =
+  "glerm_ffi" "cursor_position"
+
+pub external fn clear_current_line() -> Result(Nil, Nil) =
+  "glerm_ffi" "clear_current_line"
+
 pub type ListenerMessage(user_message) {
   Term(Event)
   User(user_message)

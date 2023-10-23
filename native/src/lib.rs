@@ -1,7 +1,7 @@
 use std::io::{stdout, Write};
 use std::sync::mpsc::channel;
 
-use crossterm::cursor::MoveTo;
+use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{
     self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers, MouseButton,
     MouseEventKind,
@@ -335,10 +335,21 @@ fn disable_mouse_capture() -> Result<(), ()> {
     execute!(stdout(), DisableMouseCapture).map_err(|_| ())
 }
 
+#[rustler::nif]
+fn cursor_position() -> Result<(u16, u16), ()> {
+    cursor::position().map_err(|_| ())
+}
+
+#[rustler::nif]
+fn clear_current_line() -> Result<(), ()> {
+    execute!(stdout(), Clear(ClearType::CurrentLine)).map_err(|_| ())
+}
+
 rustler::init!(
     "glerm_ffi",
     [
         clear,
+        clear_current_line,
         draw,
         listen,
         print,
@@ -350,5 +361,6 @@ rustler::init!(
         leave_alternate_screen,
         enable_mouse_capture,
         disable_mouse_capture,
+        cursor_position,
     ]
 );
