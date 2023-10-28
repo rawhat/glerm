@@ -1,5 +1,5 @@
 name = "glerm"
-version = "0.1.0"
+version = "0.1.1"
 description = "A terminal wrapper for Gleam"
 
 # Fill out these fields if you intend to generate HTML documentation or publish
