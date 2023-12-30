@@ -1,7 +1,7 @@
 use std::io::{stdout, Write};
 use std::sync::mpsc::channel;
 
-use crossterm::cursor::{self, MoveTo};
+use crossterm::cursor::{self, MoveLeft, MoveRight, MoveTo, MoveToColumn};
 use crossterm::event::{
     self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers, MouseButton,
     MouseEventKind,
@@ -210,9 +210,12 @@ impl Encoder for TermMouseEvent {
     }
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
-fn listen(env: Env, pid: LocalPid) {
-    let (tx, rx) = channel::<()>();
+// #[rustler::nif(schedule = "DirtyCpu")]
+#[rustler::nif]
+pub fn listen(env: Env, pid: LocalPid) -> rustler::Term<'_> {
+    // let (tx, rx) = channel::<()>();
+
+    // let new_env = env;
 
     thread::spawn::<thread::ThreadSpawner, _>(env, move |new_env| {
         loop {
@@ -267,11 +270,12 @@ fn listen(env: Env, pid: LocalPid) {
                   // }
             }
         }
-        let _ = tx.send(());
+        // let _ = tx.send(());
         atoms::ok().to_term(new_env)
     });
+    atoms::ok().to_term(env)
 
-    let _resp = rx.recv();
+    // let _resp = rx.recv();
 }
 
 #[rustler::nif]
@@ -341,6 +345,21 @@ fn cursor_position() -> Result<(u16, u16), ()> {
 }
 
 #[rustler::nif]
+fn move_cursor_left(count: u16) -> Result<(), ()> {
+    execute!(stdout(), MoveLeft(count)).map_err(|_| ())
+}
+
+#[rustler::nif]
+fn move_cursor_right(count: u16) -> Result<(), ()> {
+    execute!(stdout(), MoveRight(count)).map_err(|_| ())
+}
+
+#[rustler::nif]
+fn move_to_column(column: u16) -> Result<(), ()> {
+    execute!(stdout(), MoveToColumn(column)).map_err(|_| ())
+}
+
+#[rustler::nif]
 fn clear_current_line() -> Result<(), ()> {
     execute!(stdout(), Clear(ClearType::CurrentLine)).map_err(|_| ())
 }
@@ -362,5 +381,8 @@ rustler::init!(
         enable_mouse_capture,
         disable_mouse_capture,
         cursor_position,
+        move_cursor_left,
+        move_cursor_right,
+        move_to_column,
     ]
 );

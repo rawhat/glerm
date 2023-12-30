@@ -1,6 +1,7 @@
 name = "printer"
 version = "0.1.0"
 description = "A Gleam project"
+gleam = ">= 0.32.0"
 
 # Fill out these fields if you intend to generate HTML documentation or publish
 # your project to the Hex package manager.
@@ -10,10 +11,10 @@ description = "A Gleam project"
 # links = [{ title = "Website", href = "https://gleam.run" }]
 
 [dependencies]
-gleam_stdlib = "~> 0.31"
-gleam_erlang = "~> 0.22"
-gleam_otp = "~> 0.7"
+gleam_stdlib = "~> 0.34"
+gleam_erlang = "~> 0.23"
+gleam_otp = "~> 0.8"
 glerm = { path = "../../" }
 
 [dev-dependencies]
-gleeunit = "~> 0.10"
+gleeunit = "~> 1.0"

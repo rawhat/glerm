@@ -1,9 +1,9 @@
-import gleam/dynamic.{DecodeError, Decoder, Dynamic}
+import gleam/dynamic.{type Decoder, type Dynamic, DecodeError}
 import gleam/function
-import gleam/option.{None, Option, Some}
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/erlang/atom
-import gleam/erlang/process.{Pid, Selector, Subject}
+import gleam/erlang/process.{type Pid, type Selector, type Subject}
 import gleam/otp/actor
 
 /// These represent the noted keys being held down when another action is taken,
@@ -68,18 +68,15 @@ pub type Event {
 fn decode_atom(val: String, actual: a) -> Decoder(a) {
   let real_atom = atom.create_from_string(val)
   let decode =
-    function.compose(
-      atom.from_dynamic,
-      fn(maybe_atom) {
-        maybe_atom
-        |> result.then(fn(decoded) {
-          case decoded == real_atom {
-            True -> Ok(real_atom)
-            False -> Error([DecodeError(val, atom.to_string(decoded), [])])
-          }
-        })
-      },
-    )
+    function.compose(atom.from_dynamic, fn(maybe_atom) {
+      maybe_atom
+      |> result.then(fn(decoded) {
+        case decoded == real_atom {
+          True -> Ok(real_atom)
+          False -> Error([DecodeError(val, atom.to_string(decoded), [])])
+        }
+      })
+    })
   fn(msg) {
     decode(msg)
     |> result.replace(actual)
@@ -179,46 +176,37 @@ fn mouse_event_decoder() -> Decoder(MouseEvent) {
 /// each message that comes in.
 pub fn selector() -> Selector(Event) {
   process.new_selector()
-  |> process.selecting_record2(
-    atom.create_from_string("focus"),
-    fn(inner) {
-      inner
-      |> dynamic.any([decode_atom("gained", Gained), decode_atom("lost", Lost)])
-      |> result.map(Focus)
-      |> result.unwrap(Unknown("focus", inner))
-    },
-  )
-  |> process.selecting_record3(
-    atom.create_from_string("key"),
-    fn(first, second) {
-      let key_code = keycode_decoder()(first)
-      let modifier = modifier_decoder()(second)
-      case key_code, modifier {
-        Ok(code), Ok(mod) -> Key(code, mod)
-        _, _ -> Unknown("key", dynamic.from([first, second]))
-      }
-    },
-  )
-  |> process.selecting_record2(
-    atom.create_from_string("mouse"),
-    fn(inner) {
-      inner
-      |> mouse_event_decoder()
-      |> result.map(Mouse)
-      |> result.lazy_unwrap(fn() { Unknown("mouse", inner) })
-    },
-  )
-  |> process.selecting_record3(
-    atom.create_from_string("resize"),
-    fn(first, second) {
-      let columns = dynamic.int(first)
-      let rows = dynamic.int(second)
-      case columns, rows {
-        Ok(col), Ok(rows) -> Resize(col, rows)
-        _, _ -> Unknown("resize", dynamic.from([first, second]))
-      }
-    },
-  )
+  |> process.selecting_record2(atom.create_from_string("focus"), fn(inner) {
+    inner
+    |> dynamic.any([decode_atom("gained", Gained), decode_atom("lost", Lost)])
+    |> result.map(Focus)
+    |> result.unwrap(Unknown("focus", inner))
+  })
+  |> process.selecting_record3(atom.create_from_string("key"), fn(first, second) {
+    let key_code = keycode_decoder()(first)
+    let modifier = modifier_decoder()(second)
+    case key_code, modifier {
+      Ok(code), Ok(mod) -> Key(code, mod)
+      _, _ -> Unknown("key", dynamic.from([first, second]))
+    }
+  })
+  |> process.selecting_record2(atom.create_from_string("mouse"), fn(inner) {
+    inner
+    |> mouse_event_decoder()
+    |> result.map(Mouse)
+    |> result.lazy_unwrap(fn() { Unknown("mouse", inner) })
+  })
+  |> process.selecting_record3(atom.create_from_string("resize"), fn(
+    first,
+    second,
+  ) {
+    let columns = dynamic.int(first)
+    let rows = dynamic.int(second)
+    case columns, rows {
+      Ok(col), Ok(rows) -> Resize(col, rows)
+      _, _ -> Unknown("resize", dynamic.from([first, second]))
+    }
+  })
 }
 
 /// Fully clears the terminal window
@@ -237,7 +225,7 @@ fn listen(pid: Pid) -> Result(Nil, Nil)
 
 /// Writes the given text wherever the cursor is
 @external(erlang, "glerm_ffi", "print")
-pub fn print(data: BitString) -> Result(Nil, Nil)
+pub fn print(data: BitArray) -> Result(Nil, Nil)
 
 /// Gives back the #(column, row) count of the current terminal. This can be
 /// called to get the initial size, and then updated when `Resize` events
@@ -288,6 +276,15 @@ pub fn cursor_position() -> Result(#(Int, Int), Nil)
 
 @external(erlang, "glerm_ffi", "clear_current_line")
 pub fn clear_current_line() -> Result(Nil, Nil)
+
+@external(erlang, "glerm_ffi", "move_cursor_left")
+pub fn move_cursor_left(count: Int) -> Result(Nil, Nil)
+
+@external(erlang, "glerm_ffi", "move_cursor_right")
+pub fn move_cursor_right(count: Int) -> Result(Nil, Nil)
+
+@external(erlang, "glerm_ffi", "move_to_column")
+pub fn move_to_column(column: Int) -> Result(Nil, Nil)
 
 pub type ListenerMessage(user_message) {
   Term(Event)
@@ -346,20 +343,22 @@ pub fn start_listener(
   initial_state: state,
   loop: fn(Event, state) -> actor.Next(ListenerMessage(user_message), state),
 ) -> Result(EventSubject, actor.StartError) {
-  actor.start_spec(actor.Spec(
-    init: fn() {
-      let pid = process.self()
-      process.start(fn() { listen(pid) }, True)
-      actor.Ready(initial_state, selector())
-    },
-    init_timeout: 500,
-    loop: fn(msg, state) {
-      case loop(msg, state) {
-        actor.Continue(state, _selector) -> actor.continue(state)
-        actor.Stop(reason) -> actor.Stop(reason)
-      }
-    },
-  ))
+  actor.start_spec(
+    actor.Spec(
+      init: fn() {
+        let pid = process.self()
+        process.start(fn() { listen(pid) }, True)
+        actor.Ready(initial_state, selector())
+      },
+      init_timeout: 500,
+      loop: fn(msg, state) {
+        case loop(msg, state) {
+          actor.Continue(state, _selector) -> actor.continue(state)
+          actor.Stop(reason) -> actor.Stop(reason)
+        }
+      },
+    ),
+  )
 }
 // TODO:
 //  - test?

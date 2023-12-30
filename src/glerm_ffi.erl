@@ -2,8 +2,8 @@
 
 -export([listen/1, print/1, size/0, clear/0, move_to/2, draw/1, enable_raw_mode/0,
          disable_raw_mode/0, enter_alternate_screen/0, leave_alternate_screen/0,
-         enable_mouse_capture/0, disable_mouse_capture/0, cursor_position/0,
-         clear_current_line/0]).
+         enable_mouse_capture/0, disable_mouse_capture/0, cursor_position/0, clear_current_line/0,
+         move_cursor_right/1, move_cursor_left/1, move_to_column/1]).
 
 -nifs([{listen, 1},
        {print, 1},
@@ -18,7 +18,10 @@
        {leave_alternate_screen, 0},
        {enable_mouse_capture, 0},
        {disable_mouse_capture, 0},
-       {cursor_position, 0}]).
+       {cursor_position, 0},
+       {move_cursor_left, 1},
+       {move_cursor_right, 1},
+       {move_to_column, 1}]).
 
 -on_load init/0.
 
@@ -77,4 +80,13 @@ enable_mouse_capture() ->
   exit(nif_library_not_loaded).
 
 disable_mouse_capture() ->
+  exit(nif_library_not_loaded).
+
+move_cursor_left(_Count) ->
+  exit(nif_library_not_loaded).
+
+move_cursor_right(_Count) ->
+  exit(nif_library_not_loaded).
+
+move_to_column(_Column) ->
   exit(nif_library_not_loaded).
