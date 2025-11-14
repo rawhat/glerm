@@ -1,7 +1,7 @@
 use std::io::{stdout, Write};
 use std::sync::mpsc::channel;
 
-use crossterm::cursor::{self, MoveLeft, MoveRight, MoveTo, MoveToColumn};
+use crossterm::cursor::{self, Hide, Show, MoveLeft, MoveRight, MoveTo, MoveToColumn};
 use crossterm::event::{
     self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers, MouseButton,
     MouseEventKind,
@@ -36,14 +36,20 @@ mod atoms {
         // Key event properties
         // Special keys
         enter,
+        escape,
         left,
         right,
         down,
         up,
         backspace,
+        tab,
+        back_tab,
 
         // Regular key
         character,
+
+        // Function key
+        function,
 
         // Mouse event properties
         // Event types
@@ -111,12 +117,19 @@ impl Encoder for TermKeyEvent {
                 env,
                 &[atoms::character().to_term(env), String::from(c).encode(env)],
             ),
+            KeyCode::F(i) => tuple::make_tuple(
+                env,
+                &[atoms::function().to_term(env), i.encode(env)],
+            ),
             KeyCode::Enter => atoms::enter().to_term(env),
+            KeyCode::Esc => atoms::escape().to_term(env),
             KeyCode::Backspace => atoms::backspace().to_term(env),
             KeyCode::Left => atoms::left().to_term(env),
             KeyCode::Right => atoms::right().to_term(env),
             KeyCode::Down => atoms::down().to_term(env),
             KeyCode::Up => atoms::up().to_term(env),
+            KeyCode::Tab => atoms::tab().to_term(env),
+            KeyCode::BackTab => atoms::back_tab().to_term(env),
             _ => atoms::unsupported().to_term(env),
         };
         make_tuple(env, &[atoms::key().to_term(env), character, modifier])
@@ -166,6 +179,8 @@ impl Encoder for TermMouseEvent {
             modifier: self.event.modifiers,
         }
         .encode(env);
+        let col = self.event.column.encode(env);
+        let row = self.event.row.encode(env);
         match self.event.kind {
             MouseEventKind::Down(button) => {
                 let button = TermMouseButton { button }.encode(env);
@@ -173,7 +188,7 @@ impl Encoder for TermMouseEvent {
                     env,
                     &[
                         event_type,
-                        make_tuple(env, &[atoms::mouse_down().to_term(env), button, modifier]),
+                        make_tuple(env, &[atoms::mouse_down().to_term(env), button, col, row, modifier]),
                     ],
                 )
             }
@@ -183,7 +198,7 @@ impl Encoder for TermMouseEvent {
                     env,
                     &[
                         event_type,
-                        make_tuple(env, &[atoms::mouse_down().to_term(env), button, modifier]),
+                        make_tuple(env, &[atoms::mouse_up().to_term(env), button, modifier]),
                     ],
                 )
             }
@@ -193,11 +208,13 @@ impl Encoder for TermMouseEvent {
                     env,
                     &[
                         event_type,
-                        make_tuple(env, &[atoms::drag().to_term(env), button, modifier]),
+                        make_tuple(env, &[atoms::drag().to_term(env), button, row, col, modifier]),
                     ],
                 )
             }
-            MouseEventKind::Moved => make_tuple(env, &[event_type, atoms::moved().to_term(env)]),
+            MouseEventKind::Moved => make_tuple(env, &[event_type,
+                        make_tuple(env, &[atoms::moved().to_term(env), col, row]),
+                    ]),
             MouseEventKind::ScrollDown => make_tuple(
                 env,
                 &[event_type, atoms::scroll_down().to_term(env), modifier],
@@ -345,6 +362,16 @@ fn cursor_position() -> Result<(u16, u16), ()> {
 }
 
 #[rustler::nif]
+fn hide_cursor() -> Result<(), ()> {
+    execute!(stdout(), Hide).map_err(|_| ())
+}
+
+#[rustler::nif]
+fn show_cursor() -> Result<(), ()> {
+    execute!(stdout(), Show).map_err(|_| ())
+}
+
+#[rustler::nif]
 fn move_cursor_left(count: u16) -> Result<(), ()> {
     execute!(stdout(), MoveLeft(count)).map_err(|_| ())
 }
@@ -381,6 +408,8 @@ rustler::init!(
         enable_mouse_capture,
         disable_mouse_capture,
         cursor_position,
+        hide_cursor,
+        show_cursor,
         move_cursor_left,
         move_cursor_right,
         move_to_column,

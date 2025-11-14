@@ -1,6 +1,5 @@
 import gleam/bit_array
 import gleam/erlang/process
-import gleam/function
 import gleam/option.{Some}
 import gleam/otp/actor
 import gleam/string
@@ -9,10 +8,6 @@ import glerm.{Character, Control, Key}
 pub fn main() {
   // Create a subject to use as an "exit" signal
   let subject = process.new_subject()
-
-  let selector =
-    process.new_selector()
-    |> process.selecting(subject, function.identity)
 
   // Create a new screen for our application
   let assert Ok(_) = glerm.enter_alternate_screen()
@@ -29,7 +24,7 @@ pub fn main() {
 
   // Start the terminal NIF to begin receiving events
   let assert Ok(_subj) =
-    glerm.start_listener(0, fn(msg, state) {
+    glerm.start_listener(0, fn(state, msg) {
       case msg {
         // We need to provide some way for a user to quit the application.
         Key(Character("c"), Some(Control)) -> {
@@ -39,7 +34,7 @@ pub fn main() {
           // Tell our subject that we are done, which will unblock the
           // `select_forever` below
           process.send(subject, Nil)
-          actor.Stop(process.Normal)
+          actor.stop()
         }
         _ -> {
           // Move down to the current row
@@ -54,7 +49,7 @@ pub fn main() {
     })
 
   // Block until we receive the exit signal from the listener
-  process.select_forever(selector)
+  process.receive_forever(subject)
 
   // Return the user to their previous terminal screen and exit
   glerm.leave_alternate_screen()
